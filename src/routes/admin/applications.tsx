@@ -1,55 +1,65 @@
-import React from 'react'
-import { createFileRoute, Link } from '@tanstack/react-router'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/Card'
-import { Button } from '../../components/ui/Button'
-import { useApplications } from '../../hooks/useApplications'
-import { FileText, Clock, CheckCircle, XCircle, Eye } from 'lucide-react'
+import React from "react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "../../components/ui/Card";
+import { Button } from "../../components/ui/Button";
+import { useApplications } from "../../hooks/useApplications";
+import { FileText, Clock, CheckCircle, XCircle, Eye } from "lucide-react";
 
-export const Route = createFileRoute('/admin/applications')({
+export const Route = createFileRoute("/admin/applications")({
   component: AdminApplicationsPage,
-})
+});
 
 function AdminApplicationsPage() {
-  const { data: applications, isLoading } = useApplications()
+  const { data: applications, isLoading } = useApplications();
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'submitted':
-        return <Clock className="w-4 h-4 text-blue-500" />
-      case 'reviewing':
-        return <Eye className="w-4 h-4 text-yellow-500" />
-      case 'approved':
-        return <CheckCircle className="w-4 h-4 text-green-500" />
-      case 'rejected':
-        return <XCircle className="w-4 h-4 text-red-500" />
+      case "submitted":
+        return <Clock className="w-4 h-4 text-blue-500" />;
+      case "reviewing":
+        return <Eye className="w-4 h-4 text-yellow-500" />;
+      case "approved":
+        return <CheckCircle className="w-4 h-4 text-green-500" />;
+      case "rejected":
+        return <XCircle className="w-4 h-4 text-red-500" />;
       default:
-        return <FileText className="w-4 h-4" />
+        return <FileText className="w-4 h-4" />;
     }
-  }
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'submitted':
-        return 'text-blue-600 bg-blue-50'
-      case 'reviewing':
-        return 'text-yellow-600 bg-yellow-50'
-      case 'approved':
-        return 'text-green-600 bg-green-50'
-      case 'rejected':
-        return 'text-red-600 bg-red-50'
+      case "submitted":
+        return "text-blue-600 bg-blue-50";
+      case "reviewing":
+        return "text-yellow-600 bg-yellow-50";
+      case "approved":
+        return "text-green-600 bg-green-50";
+      case "rejected":
+        return "text-red-600 bg-red-50";
       default:
-        return 'text-gray-600 bg-gray-50'
+        return "text-gray-600 bg-gray-50";
     }
-  }
+  };
 
   const getStatusCounts = () => {
-    if (!applications?.documents) return { submitted: 0, reviewing: 0, approved: 0, rejected: 0 }
-    
-    return applications.documents.reduce((acc, app) => {
-      acc[app.status as keyof typeof acc]++
-      return acc
-    }, { submitted: 0, reviewing: 0, approved: 0, rejected: 0 })
-  }
+    if (!applications?.documents)
+      return { submitted: 0, reviewing: 0, approved: 0, rejected: 0 };
+
+    return applications.documents.reduce(
+      (acc, app) => {
+        acc[app.status as keyof typeof acc]++;
+        return acc;
+      },
+      { submitted: 0, reviewing: 0, approved: 0, rejected: 0 },
+    );
+  };
 
   if (isLoading) {
     return (
@@ -57,10 +67,10 @@ function AdminApplicationsPage() {
         <h1 className="text-3xl font-bold">Applications Management</h1>
         <div className="text-center py-8">Loading applications...</div>
       </div>
-    )
+    );
   }
 
-  const statusCounts = getStatusCounts()
+  const statusCounts = getStatusCounts();
 
   return (
     <div className="space-y-6">
@@ -83,7 +93,7 @@ function AdminApplicationsPage() {
             </div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center space-x-2">
@@ -95,7 +105,7 @@ function AdminApplicationsPage() {
             </div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center space-x-2">
@@ -107,7 +117,7 @@ function AdminApplicationsPage() {
             </div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center space-x-2">
@@ -142,10 +152,13 @@ function AdminApplicationsPage() {
                       {application.tradeName}
                     </CardTitle>
                     <CardDescription>
-                      Owner: {application.ownerName} • Phone: {application.phoneNumber}
+                      Owner: {application.ownerName} • Phone:{" "}
+                      {application.phoneNumber}
                     </CardDescription>
                   </div>
-                  <div className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(application.status)}`}>
+                  <div
+                    className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(application.status)}`}
+                  >
                     <div className="flex items-center space-x-1">
                       {getStatusIcon(application.status)}
                       <span className="capitalize">{application.status}</span>
@@ -157,19 +170,21 @@ function AdminApplicationsPage() {
                 <div className="flex items-center justify-between">
                   <div className="space-y-1 text-sm">
                     <div>
-                      <span className="font-medium">Submitted:</span>{' '}
+                      <span className="font-medium">Submitted:</span>{" "}
                       {new Date(application.createdAt).toLocaleDateString()}
                     </div>
                     {application.location && (
                       <div>
-                        <span className="font-medium">Location:</span> {application.location}
+                        <span className="font-medium">Location:</span>{" "}
+                        {application.location}
                       </div>
                     )}
                   </div>
-                  <Link to="/admin/application/$id" params={{ id: application.id }}>
-                    <Button variant="outline">
-                      Review Application
-                    </Button>
+                  <Link
+                    to="/admin/application/$id"
+                    params={{ id: application.id }}
+                  >
+                    <Button variant="outline">Review Application</Button>
                   </Link>
                 </div>
               </CardContent>
@@ -178,5 +193,5 @@ function AdminApplicationsPage() {
         </div>
       )}
     </div>
-  )
+  );
 }

@@ -1,44 +1,44 @@
-import { useState, useEffect } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { backend } from '../lib/backend'
-import { User } from '../lib/types'
+import { useState, useEffect } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { backend } from "../lib/backend";
+import { User } from "../lib/types";
 
 export function useAuth() {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
 
   const { data: user, isLoading } = useQuery({
-    queryKey: ['auth', 'user'],
+    queryKey: ["auth", "user"],
     queryFn: () => backend.auth.getCurrentUser(),
     staleTime: 5 * 60 * 1000, // 5 minutes
-  })
+  });
 
   const requestOTPMutation = useMutation({
     mutationFn: (phone: string) => backend.auth.requestPhoneOTP(phone),
-  })
+  });
 
   const verifyOTPMutation = useMutation({
     mutationFn: ({ phone, code }: { phone: string; code: string }) =>
       backend.auth.verifyOTP(phone, code),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['auth', 'user'] })
+      queryClient.invalidateQueries({ queryKey: ["auth", "user"] });
     },
-  })
+  });
 
   const emailLoginMutation = useMutation({
     mutationFn: ({ email, password }: { email: string; password: string }) =>
       backend.auth.createEmailSession(email, password),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['auth', 'user'] })
+      queryClient.invalidateQueries({ queryKey: ["auth", "user"] });
     },
-  })
+  });
 
   const logoutMutation = useMutation({
     mutationFn: () => backend.auth.logout(),
     onSuccess: () => {
-      queryClient.setQueryData(['auth', 'user'], null)
-      queryClient.clear()
+      queryClient.setQueryData(["auth", "user"], null);
+      queryClient.clear();
     },
-  })
+  });
 
   return {
     user,
@@ -55,5 +55,5 @@ export function useAuth() {
     otpError: requestOTPMutation.error,
     verifyError: verifyOTPMutation.error,
     loginError: emailLoginMutation.error,
-  }
+  };
 }

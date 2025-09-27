@@ -1,38 +1,38 @@
-import React, { useState, useEffect } from 'react'
-import { Outlet, Link, useLocation } from '@tanstack/react-router'
-import { LogOut, Menu, X, Wifi, WifiOff } from 'lucide-react'
-import { Button } from './ui/Button'
-import { useAuth } from '../hooks/useAuth'
-import { isLocalMode } from '../lib/backend'
+import React, { useState, useEffect } from "react";
+import { Outlet, Link, useLocation } from "@tanstack/react-router";
+import { LogOut, Menu, X, Wifi, WifiOff } from "lucide-react";
+import { Button } from "./ui/Button";
+import { useAuth } from "../hooks/useAuth";
+import { isLocalMode } from "../lib/backend";
 
 export function Layout() {
-  const { user, logout } = useAuth()
-  const location = useLocation()
-  const [isMenuOpen, setIsMenuOpen] = useState(false)
-  const [isOnline, setIsOnline] = useState(navigator.onLine)
+  const { user, logout } = useAuth();
+  const location = useLocation();
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
 
   useEffect(() => {
-    const handleOnline = () => setIsOnline(true)
-    const handleOffline = () => setIsOnline(false)
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
 
-    window.addEventListener('online', handleOnline)
-    window.addEventListener('offline', handleOffline)
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
 
     return () => {
-      window.removeEventListener('online', handleOnline)
-      window.removeEventListener('offline', handleOffline)
-    }
-  }, [])
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
 
   const handleLogout = async () => {
     try {
-      await logout()
+      await logout();
     } catch (error) {
-      console.error('Logout failed:', error)
+      console.error("Logout failed:", error);
     }
-  }
+  };
 
-  const isAdminRoute = location.pathname.startsWith('/admin')
+  const isAdminRoute = location.pathname.startsWith("/admin");
 
   return (
     <div className="min-h-screen bg-background">
@@ -90,7 +90,11 @@ export function Layout() {
                 size="icon"
                 onClick={() => setIsMenuOpen(!isMenuOpen)}
               >
-                {isMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+                {isMenuOpen ? (
+                  <X className="w-5 h-5" />
+                ) : (
+                  <Menu className="w-5 h-5" />
+                )}
               </Button>
             </div>
           </div>
@@ -108,12 +112,18 @@ export function Layout() {
                   ) : (
                     <>
                       <Link to="/dashboard">
-                        <Button variant="ghost" className="w-full justify-start">
+                        <Button
+                          variant="ghost"
+                          className="w-full justify-start"
+                        >
                           Dashboard
                         </Button>
                       </Link>
                       <Link to="/apply">
-                        <Button variant="ghost" className="w-full justify-start">
+                        <Button
+                          variant="ghost"
+                          className="w-full justify-start"
+                        >
                           Apply
                         </Button>
                       </Link>
@@ -138,5 +148,5 @@ export function Layout() {
         <Outlet />
       </main>
     </div>
-  )
+  );
 }

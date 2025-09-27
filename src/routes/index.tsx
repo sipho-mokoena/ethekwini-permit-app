@@ -1,18 +1,18 @@
-import { createFileRoute, redirect } from '@tanstack/react-router'
-import { backend } from '../lib/backend'
+import { createFileRoute, redirect } from "@tanstack/react-router";
+import { backend } from "../lib/backend";
 
-export const Route = createFileRoute('/')({
+export const Route = createFileRoute("/")({
   beforeLoad: async () => {
-    const user = await backend.auth.getCurrentUser()
-    
+    const user = await backend.auth.getCurrentUser();
+
     if (!user) {
-      throw redirect({ to: '/login' })
+      throw redirect({ to: "/login" });
     }
-    
+
     if (user.isAdmin) {
-      throw redirect({ to: '/admin/applications' })
+      throw redirect({ to: "/admin/applications" });
     }
-    
-    throw redirect({ to: '/dashboard' })
+
+    throw redirect({ to: "/dashboard" });
   },
-})
+});
