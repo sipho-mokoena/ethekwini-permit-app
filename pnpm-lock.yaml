@@ -17,6 +17,9 @@ dependencies:
   '@tanstack/react-router':
     specifier: ^1.132.7
     version: 1.132.7(react-dom@19.1.1)(react@19.1.1)
+  '@tanstack/router':
+    specifier: 0.0.1-beta.53
+    version: 0.0.1-beta.53
   '@tanstack/router-devtools':
     specifier: ^1.132.11
     version: 1.132.11(@tanstack/react-router@1.132.7)(@tanstack/router-core@1.132.7)(@types/node@24.5.2)(csstype@3.1.3)(react-dom@19.1.1)(react@19.1.1)(solid-js@1.9.9)(tiny-invariant@1.3.3)
@@ -235,6 +238,11 @@ packages:
       '@babel/core': 7.28.4
       '@babel/helper-plugin-utils': 7.27.1
     dev: true
+
+  /@babel/runtime@7.28.4:
+    resolution: {integrity: sha512-Q/N6JNWvIvPnLDvjlE1OUBLPQHH6l3CltCEsHIujp45zQUSSh8K+gHnaEX45yAT1nyngnINhvWtzN+Nb9D8RAQ==}
+    engines: {node: '>=6.9.0'}
+    dev: false
 
   /@babel/template@7.27.2:
     resolution: {integrity: sha512-LPDZ85aEJyYSd18/DkjNh4/y1ntkE5KwUHWTiqgRxruuZL2F1yuHligVHLvcHY2vMHXttKFpJn6LwfI7cw7ODw==}
@@ -1086,6 +1094,22 @@ packages:
       - tiny-invariant
       - tsx
       - yaml
+    dev: false
+
+  /@tanstack/router@0.0.1-beta.53:
+    resolution: {integrity: sha512-nX1avh939ufOCoXhJ5wihX/ft6sn50ARrj4FAhRYn50KKzo9fXsYSmPyVgqVdW0hJ4n9XXKIMkwwpzEhLQmqrA==}
+    engines: {node: '>=12'}
+    dependencies:
+      '@babel/runtime': 7.28.4
+      '@tanstack/store': 0.0.1-beta.52
+      tiny-invariant: 1.3.3
+    dev: false
+
+  /@tanstack/store@0.0.1-beta.52:
+    resolution: {integrity: sha512-3/5XqeG09sCJnakHpq8qgXjdVpm97aITbi1wfbjLGXdVsss62zpJAvc4vL8ccHf+J/OmoS4dJTNuEZ0alywZtg==}
+    engines: {node: '>=12'}
+    dependencies:
+      immer: 9.0.21
     dev: false
 
   /@tanstack/store@0.7.7:
@@ -2033,6 +2057,10 @@ packages:
     resolution: {integrity: sha512-hsBTNUqQTDwkWtcdYI2i06Y/nUBEsNEDJKjWdigLvegy8kDuJAS8uRlpkkcQpyEXL0Z/pjDy5HBmMjRCJ2gq+g==}
     engines: {node: '>= 4'}
     dev: true
+
+  /immer@9.0.21:
+    resolution: {integrity: sha512-bc4NBHqOqSfRW7POMkHd51LvClaeMXpm8dx0e8oE2GORbq5aRK7Bxl4FyzVLdGtLmvLKL7BTDBG5ACQm4HWjTA==}
+    dev: false
 
   /import-fresh@3.3.1:
     resolution: {integrity: sha512-TR3KfrTZTYLPB6jUjfx6MF9WcWrHL9su5TObK4ZkYgBdWKPOFoSoQIdEuTuR82pmtxH2spWG9h6etwfr1pLBqQ==}
