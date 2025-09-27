@@ -17,12 +17,9 @@ dependencies:
   '@tanstack/react-router':
     specifier: ^1.132.7
     version: 1.132.7(react-dom@19.1.1)(react@19.1.1)
-  '@tanstack/router':
-    specifier: 0.0.1-beta.53
-    version: 0.0.1-beta.53
   '@tanstack/router-devtools':
     specifier: ^1.132.11
-    version: 1.132.11(@tanstack/react-router@1.132.7)(@tanstack/router-core@1.132.7)(@types/node@24.5.2)(csstype@3.1.3)(react-dom@19.1.1)(react@19.1.1)(solid-js@1.9.9)(tiny-invariant@1.3.3)
+    version: 1.132.11(@tanstack/react-router@1.132.7)(@tanstack/router-core@1.132.7)(csstype@3.1.3)(react-dom@19.1.1)(react@19.1.1)(solid-js@1.9.9)(tiny-invariant@1.3.3)
   appwrite:
     specifier: ^17.0.2
     version: 17.0.2
@@ -55,9 +52,6 @@ devDependencies:
   '@eslint/js':
     specifier: ^9.19.0
     version: 9.36.0
-  '@types/node':
-    specifier: ^24.5.2
-    version: 24.5.2
   '@types/react':
     specifier: ^19.0.8
     version: 19.1.14
@@ -87,7 +81,7 @@ devDependencies:
     version: 3.5.3
   vite:
     specifier: ^6.1.0
-    version: 6.3.6(@types/node@24.5.2)
+    version: 6.3.6
 
 packages:
 
@@ -238,11 +232,6 @@ packages:
       '@babel/core': 7.28.4
       '@babel/helper-plugin-utils': 7.27.1
     dev: true
-
-  /@babel/runtime@7.28.4:
-    resolution: {integrity: sha512-Q/N6JNWvIvPnLDvjlE1OUBLPQHH6l3CltCEsHIujp45zQUSSh8K+gHnaEX45yAT1nyngnINhvWtzN+Nb9D8RAQ==}
-    engines: {node: '>=6.9.0'}
-    dev: false
 
   /@babel/template@7.27.2:
     resolution: {integrity: sha512-LPDZ85aEJyYSd18/DkjNh4/y1ntkE5KwUHWTiqgRxruuZL2F1yuHligVHLvcHY2vMHXttKFpJn6LwfI7cw7ODw==}
@@ -932,7 +921,7 @@ packages:
       '@tailwindcss/node': 4.1.13
       '@tailwindcss/oxide': 4.1.13
       tailwindcss: 4.1.13
-      vite: 6.3.6(@types/node@24.5.2)
+      vite: 6.3.6
     dev: false
 
   /@tanstack/history@1.132.0:
@@ -953,7 +942,7 @@ packages:
       react: 19.1.1
     dev: false
 
-  /@tanstack/react-router-devtools@1.132.11(@tanstack/react-router@1.132.7)(@tanstack/router-core@1.132.7)(@types/node@24.5.2)(csstype@3.1.3)(react-dom@19.1.1)(react@19.1.1)(solid-js@1.9.9)(tiny-invariant@1.3.3):
+  /@tanstack/react-router-devtools@1.132.11(@tanstack/react-router@1.132.7)(@tanstack/router-core@1.132.7)(csstype@3.1.3)(react-dom@19.1.1)(react@19.1.1)(solid-js@1.9.9)(tiny-invariant@1.3.3):
     resolution: {integrity: sha512-5UxJjyHxDBX2Sh8E5oN+YagfHiQ0bnhDx6Gguff2sCcMw/MgxaAcQ51EoQcAOwt36KAvh9CIp6VJiM9X6uhVRw==}
     engines: {node: '>=12'}
     peerDependencies:
@@ -962,10 +951,10 @@ packages:
       react-dom: '>=18.0.0 || >=19.0.0'
     dependencies:
       '@tanstack/react-router': 1.132.7(react-dom@19.1.1)(react@19.1.1)
-      '@tanstack/router-devtools-core': 1.132.11(@tanstack/router-core@1.132.7)(@types/node@24.5.2)(csstype@3.1.3)(solid-js@1.9.9)(tiny-invariant@1.3.3)
+      '@tanstack/router-devtools-core': 1.132.11(@tanstack/router-core@1.132.7)(csstype@3.1.3)(solid-js@1.9.9)(tiny-invariant@1.3.3)
       react: 19.1.1
       react-dom: 19.1.1(react@19.1.1)
-      vite: 7.1.7(@types/node@24.5.2)
+      vite: 7.1.7
     transitivePeerDependencies:
       - '@tanstack/router-core'
       - '@types/node'
@@ -1026,7 +1015,7 @@ packages:
       tiny-warning: 1.0.3
     dev: false
 
-  /@tanstack/router-devtools-core@1.132.11(@tanstack/router-core@1.132.7)(@types/node@24.5.2)(csstype@3.1.3)(solid-js@1.9.9)(tiny-invariant@1.3.3):
+  /@tanstack/router-devtools-core@1.132.11(@tanstack/router-core@1.132.7)(csstype@3.1.3)(solid-js@1.9.9)(tiny-invariant@1.3.3):
     resolution: {integrity: sha512-77cMrmVzLXVuSxTr6HTQSTVqzRtY4ITyDk4pZs2QI84dHujt0aMjHj9WnvqBe/0QW0nqgJBi4e8PmsVNXgUv7Q==}
     engines: {node: '>=12'}
     peerDependencies:
@@ -1044,7 +1033,7 @@ packages:
       goober: 2.1.16(csstype@3.1.3)
       solid-js: 1.9.9
       tiny-invariant: 1.3.3
-      vite: 7.1.7(@types/node@24.5.2)
+      vite: 7.1.7
     transitivePeerDependencies:
       - '@types/node'
       - jiti
@@ -1059,7 +1048,7 @@ packages:
       - yaml
     dev: false
 
-  /@tanstack/router-devtools@1.132.11(@tanstack/react-router@1.132.7)(@tanstack/router-core@1.132.7)(@types/node@24.5.2)(csstype@3.1.3)(react-dom@19.1.1)(react@19.1.1)(solid-js@1.9.9)(tiny-invariant@1.3.3):
+  /@tanstack/router-devtools@1.132.11(@tanstack/react-router@1.132.7)(@tanstack/router-core@1.132.7)(csstype@3.1.3)(react-dom@19.1.1)(react@19.1.1)(solid-js@1.9.9)(tiny-invariant@1.3.3):
     resolution: {integrity: sha512-4t08QMnjQ2b32uUJ4wCUMiO8cryqHf5aDPOmJ6UVcqd28G70TeyzypHVk/7i0CnvheNBp+7lQxndoBFlhlewzw==}
     engines: {node: '>=12'}
     peerDependencies:
@@ -1072,13 +1061,13 @@ packages:
         optional: true
     dependencies:
       '@tanstack/react-router': 1.132.7(react-dom@19.1.1)(react@19.1.1)
-      '@tanstack/react-router-devtools': 1.132.11(@tanstack/react-router@1.132.7)(@tanstack/router-core@1.132.7)(@types/node@24.5.2)(csstype@3.1.3)(react-dom@19.1.1)(react@19.1.1)(solid-js@1.9.9)(tiny-invariant@1.3.3)
+      '@tanstack/react-router-devtools': 1.132.11(@tanstack/react-router@1.132.7)(@tanstack/router-core@1.132.7)(csstype@3.1.3)(react-dom@19.1.1)(react@19.1.1)(solid-js@1.9.9)(tiny-invariant@1.3.3)
       clsx: 2.1.1
       csstype: 3.1.3
       goober: 2.1.16(csstype@3.1.3)
       react: 19.1.1
       react-dom: 19.1.1(react@19.1.1)
-      vite: 7.1.7(@types/node@24.5.2)
+      vite: 7.1.7
     transitivePeerDependencies:
       - '@tanstack/router-core'
       - '@types/node'
@@ -1094,22 +1083,6 @@ packages:
       - tiny-invariant
       - tsx
       - yaml
-    dev: false
-
-  /@tanstack/router@0.0.1-beta.53:
-    resolution: {integrity: sha512-nX1avh939ufOCoXhJ5wihX/ft6sn50ARrj4FAhRYn50KKzo9fXsYSmPyVgqVdW0hJ4n9XXKIMkwwpzEhLQmqrA==}
-    engines: {node: '>=12'}
-    dependencies:
-      '@babel/runtime': 7.28.4
-      '@tanstack/store': 0.0.1-beta.52
-      tiny-invariant: 1.3.3
-    dev: false
-
-  /@tanstack/store@0.0.1-beta.52:
-    resolution: {integrity: sha512-3/5XqeG09sCJnakHpq8qgXjdVpm97aITbi1wfbjLGXdVsss62zpJAvc4vL8ccHf+J/OmoS4dJTNuEZ0alywZtg==}
-    engines: {node: '>=12'}
-    dependencies:
-      immer: 9.0.21
     dev: false
 
   /@tanstack/store@0.7.7:
@@ -1152,11 +1125,6 @@ packages:
     resolution: {integrity: sha512-5+fP8P8MFNC+AyZCDxrB2pkZFPGzqQWUzpSeuuVLvm8VMcorNYavBqoFcxK8bQz4Qsbn4oUEEem4wDLfcysGHA==}
     dev: true
 
-  /@types/node@24.5.2:
-    resolution: {integrity: sha512-FYxk1I7wPv3K2XBaoyH2cTnocQEu8AOZ60hPbsyukMPLv5/5qr7V1i8PLHdl6Zf87I+xZXFvPCXYjiTFq+YSDQ==}
-    dependencies:
-      undici-types: 7.12.0
-
   /@types/react-dom@19.1.9(@types/react@19.1.14):
     resolution: {integrity: sha512-qXRuZaOsAdXKFyOhRBg6Lqqc0yay13vN7KrIg4L7N4aaHN68ma9OK3NE1BoDFgFOTfM7zg+3/8+2n8rLUH3OKQ==}
     peerDependencies:
@@ -1183,7 +1151,7 @@ packages:
       '@rolldown/pluginutils': 1.0.0-beta.27
       '@types/babel__core': 7.20.5
       react-refresh: 0.17.0
-      vite: 6.3.6(@types/node@24.5.2)
+      vite: 6.3.6
     transitivePeerDependencies:
       - supports-color
     dev: true
@@ -2057,10 +2025,6 @@ packages:
     resolution: {integrity: sha512-hsBTNUqQTDwkWtcdYI2i06Y/nUBEsNEDJKjWdigLvegy8kDuJAS8uRlpkkcQpyEXL0Z/pjDy5HBmMjRCJ2gq+g==}
     engines: {node: '>= 4'}
     dev: true
-
-  /immer@9.0.21:
-    resolution: {integrity: sha512-bc4NBHqOqSfRW7POMkHd51LvClaeMXpm8dx0e8oE2GORbq5aRK7Bxl4FyzVLdGtLmvLKL7BTDBG5ACQm4HWjTA==}
-    dev: false
 
   /import-fresh@3.3.1:
     resolution: {integrity: sha512-TR3KfrTZTYLPB6jUjfx6MF9WcWrHL9su5TObK4ZkYgBdWKPOFoSoQIdEuTuR82pmtxH2spWG9h6etwfr1pLBqQ==}
@@ -3119,9 +3083,6 @@ packages:
       which-boxed-primitive: 1.1.1
     dev: true
 
-  /undici-types@7.12.0:
-    resolution: {integrity: sha512-goOacqME2GYyOZZfb5Lgtu+1IDmAlAEu5xnD3+xTzS10hT0vzpf0SPjkXwAw9Jm+4n/mQGDP3LO8CPbYROeBfQ==}
-
   /update-browserslist-db@1.1.3(browserslist@4.26.2):
     resolution: {integrity: sha512-UxhIZQ+QInVdunkDAaiazvvT/+fXL5Osr0JZlJulepYu6Jd7qJtDZjlur0emRlT71EN3ScPoE7gvsuIKKNavKw==}
     hasBin: true
@@ -3147,7 +3108,7 @@ packages:
       react: 19.1.1
     dev: false
 
-  /vite@6.3.6(@types/node@24.5.2):
+  /vite@6.3.6:
     resolution: {integrity: sha512-0msEVHJEScQbhkbVTb/4iHZdJ6SXp/AvxL2sjwYQFfBqleHtnCqv1J3sa9zbWz/6kW1m9Tfzn92vW+kZ1WV6QA==}
     engines: {node: ^18.0.0 || ^20.0.0 || >=22.0.0}
     hasBin: true
@@ -3187,7 +3148,6 @@ packages:
       yaml:
         optional: true
     dependencies:
-      '@types/node': 24.5.2
       esbuild: 0.25.10
       fdir: 6.5.0(picomatch@4.0.3)
       picomatch: 4.0.3
@@ -3197,7 +3157,7 @@ packages:
     optionalDependencies:
       fsevents: 2.3.3
 
-  /vite@7.1.7(@types/node@24.5.2):
+  /vite@7.1.7:
     resolution: {integrity: sha512-VbA8ScMvAISJNJVbRDTJdCwqQoAareR/wutevKanhR2/1EkoXVZVkkORaYm/tNVCjP/UDTKtcw3bAkwOUdedmA==}
     engines: {node: ^20.19.0 || >=22.12.0}
     hasBin: true
@@ -3237,7 +3197,6 @@ packages:
       yaml:
         optional: true
     dependencies:
-      '@types/node': 24.5.2
       esbuild: 0.25.10
       fdir: 6.5.0(picomatch@4.0.3)
       picomatch: 4.0.3
