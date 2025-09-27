@@ -26,14 +26,37 @@ function isConflict(error: unknown): boolean {
 
 async function ensureDatabase() {
   try {
+    await databases.get(DATABASE_ID);
+    console.log("✓ Database already exists");
+    return;
+  } catch (error) {
+    if (
+      !(error instanceof AppwriteException) ||
+      (error instanceof AppwriteException && error.code !== 404)
+    ) {
+      throw error;
+    }
+  }
+
+  try {
     await databases.create(DATABASE_ID, "Spaza Registration Database");
     console.log("✓ Database created");
   } catch (error) {
     if (isConflict(error)) {
       console.log("✓ Database already exists");
-    } else {
-      throw error;
+      return;
     }
+
+    if (
+      error instanceof AppwriteException &&
+      error.code === 403 &&
+      error.type === "additional_resource_not_allowed"
+    ) {
+      console.log("✓ Database already exists (plan limit reached)");
+      return;
+    }
+
+    throw error;
   }
 }
 
@@ -58,6 +81,29 @@ async function ensureApplicationsCollection() {
       throw error;
     }
     console.log("✓ Applications collection already exists");
+  }
+
+  const existingAttributeKeys = new Set<string>();
+  try {
+    const collection = await databases.getCollection(
+      DATABASE_ID,
+      APPLICATIONS_COLLECTION_ID,
+    );
+
+    if (Array.isArray(collection.attributes)) {
+      for (const attribute of collection.attributes as Array<{ key?: string }>) {
+        if (attribute?.key) {
+          existingAttributeKeys.add(attribute.key);
+        }
+      }
+    }
+  } catch (error) {
+    if (
+      !(error instanceof AppwriteException) ||
+      (error instanceof AppwriteException && error.code !== 404)
+    ) {
+      throw error;
+    }
   }
 
   const attributes: Array<
@@ -87,11 +133,15 @@ async function ensureApplicationsCollection() {
       key: "status",
       elements: ["submitted", "reviewing", "approved", "rejected"],
       required: true,
-      default: "submitted",
     },
   ];
 
   for (const attribute of attributes) {
+    if (existingAttributeKeys.has(attribute.key)) {
+      console.log(`  ✓ ${attribute.key} attribute already exists`);
+      continue;
+    }
+
     try {
       if (attribute.kind === "enum") {
         await databases.createEnumAttribute(
