@@ -1,17 +1,21 @@
+import "dotenv/config";
+import fs from "node:fs";
+import os from "node:os";
+import path, { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { openDB } from "idb";
 import {
-  Account,
+  AppwriteException,
   Client,
   Databases,
   ID,
   Permission,
   Role,
   Storage,
-} from "appwrite";
-import { openDB } from "idb";
+} from "node-appwrite";
 
-// Appwrite configuration
+// Appwrite configuration (Node SDK using API Key)
 const client = new Client();
-const account = new Account(client);
 const databases = new Databases(client);
 const storage = new Storage(client);
 
@@ -20,6 +24,22 @@ const APPLICATIONS_COLLECTION_ID = "applications";
 const UPLOADED_DOCUMENTS_COLLECTION_ID = "uploaded_documents";
 const STORAGE_BUCKET_ID = "application-files";
 
+// Minimal blob-like type to avoid DOM dependency in Node
+type BrowserBlob = {
+  arrayBuffer: () => Promise<ArrayBuffer>;
+  type?: string;
+};
+
+// Structural type to call Node SDK createFile without DOM File typing conflicts
+type StorageCompat = {
+  createFile: (
+    bucketId: string,
+    fileId: string,
+    file: unknown,
+    permissions?: unknown,
+  ) => Promise<unknown>;
+};
+
 interface LocalUser {
   id: string;
   phone: string;
@@ -27,6 +47,7 @@ interface LocalUser {
   phoneVerified: boolean;
   isAdmin: boolean;
   email?: string;
+  password?: string;
 }
 
 interface LocalApplication {
@@ -56,53 +77,96 @@ interface LocalFile {
   fileId: string;
   ownerId: string;
   filename: string;
-  blob: Blob;
+  blob?: BrowserBlob; // present when reading directly from IndexedDB in browser env
+  base64?: string; // present when using JSON export
+  mimeType?: string; // present when using JSON export
   uploadedAt: string;
 }
 
 async function migrateLocalToAppwrite() {
   try {
-    // Get configuration from environment
-    const endpoint = process.env.VITE_APPWRITE_ENDPOINT;
-    const projectId = process.env.VITE_APPWRITE_PROJECT_ID;
-    const adminEmail = process.env.ADMIN_EMAIL;
-    const adminPassword = process.env.ADMIN_PASSWORD;
+    // Get configuration from environment (prefer server-side vars if provided)
+    const endpoint =
+      process.env.APPWRITE_ENDPOINT ?? process.env.VITE_APPWRITE_ENDPOINT;
+    const projectId =
+      process.env.APPWRITE_PROJECT_ID ?? process.env.VITE_APPWRITE_PROJECT_ID;
+    const apiKey = process.env.APPWRITE_API_KEY;
 
-    if (!endpoint || !projectId) {
+    if (!endpoint || !projectId || !apiKey) {
       throw new Error(
-        "Please set VITE_APPWRITE_ENDPOINT and VITE_APPWRITE_PROJECT_ID environment variables",
+        "Missing APPWRITE_ENDPOINT/VITE_APPWRITE_ENDPOINT, APPWRITE_PROJECT_ID/VITE_APPWRITE_PROJECT_ID, or APPWRITE_API_KEY.",
       );
     }
 
-    if (!adminEmail || !adminPassword) {
-      throw new Error(
-        "Please set ADMIN_EMAIL and ADMIN_PASSWORD environment variables for authentication",
-      );
+    client.setEndpoint(endpoint).setProject(projectId).setKey(apiKey);
+
+    console.log("🔐 Using Appwrite API Key authentication (server-side)…");
+    console.log("✓ Auth configured");
+
+    // Load data from a JSON export if provided; otherwise try IndexedDB (likely empty in Node)
+    let users: LocalUser[] = [];
+    let applications: LocalApplication[] = [];
+    let uploadedDocuments: LocalUploadedDocument[] = [];
+    let files: LocalFile[] = [];
+
+    // Support --json path or MIGRATION_JSON env var
+    const argvJsonIndex = process.argv.findIndex((a) => a === "--json");
+    const jsonPathArg =
+      argvJsonIndex > -1 ? process.argv[argvJsonIndex + 1] : undefined;
+    const jsonPath = process.env.MIGRATION_JSON || jsonPathArg;
+
+    if (jsonPath) {
+      console.log(`📄 Loading migration data from JSON: ${jsonPath}`);
+      const raw = await fs.promises.readFile(jsonPath, "utf-8");
+      const payload = JSON.parse(raw) as {
+        users?: LocalUser[];
+        applications?: LocalApplication[];
+        uploaded_documents?: LocalUploadedDocument[];
+        files?: Array<
+          Omit<LocalFile, "blob"> & { base64: string; mimeType: string }
+        >;
+      };
+
+      users = payload.users ?? [];
+      applications = payload.applications ?? [];
+      uploadedDocuments = payload.uploaded_documents ?? [];
+      files = (payload.files ?? []) as LocalFile[];
+    } else {
+      try {
+        console.log("📂 Opening local database (IndexedDB)…");
+        const localDb = await openDB("spaza-db", 1);
+        users = (await localDb.getAll("users")) as LocalUser[];
+        applications = (await localDb.getAll(
+          "applications",
+        )) as LocalApplication[];
+        uploadedDocuments = (await localDb.getAll(
+          "uploaded_documents",
+        )) as LocalUploadedDocument[];
+        files = (await localDb.getAll("files")) as LocalFile[];
+      } catch {
+        console.warn(
+          "⚠️ IndexedDB is not accessible in Node. Provide a JSON export via MIGRATION_JSON env or --json <path>.",
+        );
+      }
     }
-
-    client.setEndpoint(endpoint).setProject(projectId);
-
-    console.log("🔐 Authenticating with Appwrite...");
-    await account.createEmailPasswordSession(adminEmail, adminPassword);
-    console.log("✓ Authenticated successfully");
-
-    // Open local IndexedDB
-    console.log("📂 Opening local database...");
-    const localDb = await openDB("spaza-db", 1);
-
-    // Get all data from local storage
-    const users = (await localDb.getAll("users")) as LocalUser[];
-    const applications = (await localDb.getAll(
-      "applications",
-    )) as LocalApplication[];
-    const uploadedDocuments = (await localDb.getAll(
-      "uploaded_documents",
-    )) as LocalUploadedDocument[];
-    const files = (await localDb.getAll("files")) as LocalFile[];
 
     console.log(
       `📊 Found ${users.length} users, ${applications.length} applications, ${uploadedDocuments.length} documents, ${files.length} files`,
     );
+
+    if (
+      users.length === 0 &&
+      applications.length === 0 &&
+      uploadedDocuments.length === 0 &&
+      files.length === 0
+    ) {
+      console.warn(
+        "⚠️ No local data found. This script runs in Node and cannot access your browser's IndexedDB. Export your local data to JSON in the browser and re-run this script with that file, or run a browser-based migration.",
+      );
+      console.warn(
+        "Tip: Implement an in-app export, then modify this script to read the exported JSON instead of IndexedDB.",
+      );
+    }
 
     // Migrate files first
     console.log("📁 Migrating files...");
@@ -112,16 +176,44 @@ async function migrateLocalToAppwrite() {
       try {
         const newFileId = ID.unique();
 
-        // Convert blob to File object
-        const fileObj = new File([file.blob], file.filename, {
-          type: file.blob.type,
-          lastModified: new Date(file.uploadedAt).getTime(),
-        });
+        // Prepare a temp file for upload
+        let buffer: Buffer | null = null;
+        if (file.base64) {
+          buffer = Buffer.from(file.base64, "base64");
+        } else if (file.blob) {
+          const arrayBuffer = await file.blob.arrayBuffer();
+          buffer = Buffer.from(arrayBuffer);
+        }
 
-        await storage.createFile(STORAGE_BUCKET_ID, newFileId, fileObj, [
-          Permission.read(Role.user(file.ownerId)),
-          Permission.read(Role.team("admins")),
-        ]);
+        if (!buffer) {
+          console.warn(
+            `  ⚠️ Skipping file ${file.filename} - no data available`,
+          );
+          continue;
+        }
+
+        const tmpDir = await fs.promises.mkdtemp(
+          path.join(os.tmpdir(), "appwrite-mig-"),
+        );
+        const tmpPath = path.join(tmpDir, file.filename || `${newFileId}`);
+        await fs.promises.writeFile(tmpPath, buffer);
+
+        try {
+          const stream = fs.createReadStream(tmpPath);
+          await (storage as unknown as StorageCompat).createFile(
+            STORAGE_BUCKET_ID,
+            newFileId,
+            stream,
+            [Permission.read(Role.team("admins"))],
+          );
+        } finally {
+          // Cleanup temp file
+          try {
+            await fs.promises.rm(tmpDir, { recursive: true, force: true });
+          } catch {
+            /* ignore */
+          }
+        }
 
         fileIdMapping[file.fileId] = newFileId;
         console.log(`  ✓ Migrated file: ${file.filename}`);
@@ -151,10 +243,7 @@ async function migrateLocalToAppwrite() {
             formData: app.formData,
             status: app.status,
           },
-          [
-            Permission.read(Role.user(app.ownerId)),
-            Permission.read(Role.team("admins")),
-          ],
+          [Permission.read(Role.team("admins"))],
         );
 
         applicationIdMapping[app.id] = newAppId;
@@ -193,10 +282,7 @@ async function migrateLocalToAppwrite() {
             fileId: newFileId,
             filename: doc.filename,
           },
-          [
-            Permission.read(Role.user(doc.ownerId)),
-            Permission.read(Role.team("admins")),
-          ],
+          [Permission.read(Role.team("admins"))],
         );
 
         console.log(`  ✓ Migrated document: ${doc.filename}`);
@@ -216,16 +302,29 @@ async function migrateLocalToAppwrite() {
     );
     console.log(`- ${uploadedDocuments.length} document records processed`);
 
-    // Logout
-    await account.deleteSession("current");
+    console.log(
+      "\nNote: Documents and files were created with read access for the 'admins' team only to avoid invalid user references during migration.",
+    );
   } catch (error) {
-    console.error("❌ Migration failed:", error);
+    if (error instanceof AppwriteException) {
+      console.error(
+        `❌ Migration failed: AppwriteException(${error.code} ${error.type}): ${error.message}`,
+      );
+    } else {
+      console.error("❌ Migration failed:", error);
+    }
     process.exit(1);
   }
 }
 
 // Run migration if called directly
-if (require.main === module) {
+const isDirectRun =
+  typeof process !== "undefined" &&
+  typeof import.meta !== "undefined" &&
+  process.argv[1] &&
+  resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url));
+
+if (isDirectRun) {
   migrateLocalToAppwrite();
 }
 

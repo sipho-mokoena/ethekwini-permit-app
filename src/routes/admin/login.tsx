@@ -20,7 +20,7 @@ function AdminLoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const { emailLogin, isLoggingIn, loginError, user } = useAuth();
+  const { login, isLoggingIn, loginError, user } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -36,7 +36,7 @@ function AdminLoginPage() {
     setError("");
 
     try {
-      const result = await emailLogin({ email, password });
+      const result = await login({ email: email.trim(), password });
 
       if (result.user.isAdmin) {
         navigate({ to: "/admin/applications" });

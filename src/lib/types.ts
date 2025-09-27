@@ -7,6 +7,18 @@ export interface User {
   email?: string;
 }
 
+export interface RegisterInput {
+  email: string;
+  password: string;
+  ownerName: string;
+  phone: string;
+}
+
+export interface LoginInput {
+  email: string;
+  password: string;
+}
+
 export interface Application {
   id: string;
   ownerId: string;
@@ -53,16 +65,8 @@ export interface FileUploadResult {
 
 export interface Backend {
   auth: {
-    requestPhoneOTP(
-      phone: string,
-    ): Promise<{ ok: boolean; cooldownUntil?: number; userId?: string }>;
-    verifyOTP(
-      input: { userId: string; code: string },
-    ): Promise<{ user: User; sessionToken?: string }>;
-    createEmailSession(
-      email: string,
-      password: string,
-    ): Promise<{ user: User }>;
+    register(input: RegisterInput): Promise<{ user: User }>;
+    login(credentials: LoginInput): Promise<{ user: User }>;
     getCurrentUser(): Promise<User | null>;
     logout(): Promise<void>;
   };

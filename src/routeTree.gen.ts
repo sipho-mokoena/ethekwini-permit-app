@@ -13,20 +13,20 @@ import { createFileRoute } from "@tanstack/react-router";
 // Import Routes
 
 import { Route as rootRoute } from "./routes/__root";
-import { Route as VerifyImport } from "./routes/verify";
-import { Route as LoginImport } from "./routes/login";
-import { Route as DashboardImport } from "./routes/dashboard";
-import { Route as ApplyImport } from "./routes/apply";
-import { Route as indexImport } from "./routes/index";
-import { Route as ApplicationIdImport } from "./routes/application/$id";
-import { Route as AdminLoginImport } from "./routes/admin/login";
-import { Route as AdminApplicationsImport } from "./routes/admin/applications";
 import { Route as AdminApplicationIdImport } from "./routes/admin/application/$id";
+import { Route as AdminApplicationsImport } from "./routes/admin/applications";
+import { Route as AdminLoginImport } from "./routes/admin/login";
+import { Route as ApplicationIdImport } from "./routes/application/$id";
+import { Route as ApplyImport } from "./routes/apply";
+import { Route as DashboardImport } from "./routes/dashboard";
+import { Route as indexImport } from "./routes/index";
+import { Route as LoginImport } from "./routes/login";
+import { Route as RegisterImport } from "./routes/register";
 
 // Create/Update Routes
 
-const VerifyRoute = VerifyImport.update({
-  path: "/verify",
+const RegisterRoute = RegisterImport.update({
+  path: "/register",
   getParentRoute: () => rootRoute,
 } as any);
 
@@ -123,11 +123,11 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof LoginImport;
       parentRoute: typeof rootRoute;
     };
-    "/verify": {
-      id: "/verify";
-      path: "/verify";
-      fullPath: "/verify";
-      preLoaderRoute: typeof VerifyImport;
+    "/register": {
+      id: "/register";
+      path: "/register";
+      fullPath: "/register";
+      preLoaderRoute: typeof RegisterImport;
       parentRoute: typeof rootRoute;
     };
     "/admin/application/$id": {
@@ -144,7 +144,7 @@ declare module "@tanstack/react-router" {
 
 export const routeTree = rootRoute.addChildren({
   indexRoute,
-  VerifyRoute,
+  RegisterRoute,
   LoginRoute,
   DashboardRoute,
   ApplyRoute,

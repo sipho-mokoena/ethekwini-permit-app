@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { backend } from "../lib/backend";
 
 export function useAuth() {
@@ -10,22 +10,18 @@ export function useAuth() {
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
-  const requestOTPMutation = useMutation({
-    mutationFn: (phone: string) => backend.auth.requestPhoneOTP(phone),
-  });
-
-  const verifyOTPMutation = useMutation({
-    mutationFn: ({ userId, code }: { userId: string; code: string }) =>
-      backend.auth.verifyOTP({ userId, code }),
-    onSuccess: () => {
+  const registerMutation = useMutation({
+    mutationFn: backend.auth.register,
+    onSuccess: (data) => {
+      queryClient.setQueryData(["auth", "user"], data.user);
       queryClient.invalidateQueries({ queryKey: ["auth", "user"] });
     },
   });
 
-  const emailLoginMutation = useMutation({
-    mutationFn: ({ email, password }: { email: string; password: string }) =>
-      backend.auth.createEmailSession(email, password),
-    onSuccess: () => {
+  const loginMutation = useMutation({
+    mutationFn: backend.auth.login,
+    onSuccess: (data) => {
+      queryClient.setQueryData(["auth", "user"], data.user);
       queryClient.invalidateQueries({ queryKey: ["auth", "user"] });
     },
   });
@@ -42,16 +38,13 @@ export function useAuth() {
     user,
     isLoading,
     isAuthenticated: !!user,
-    requestOTP: requestOTPMutation.mutateAsync,
-    verifyOTP: verifyOTPMutation.mutateAsync,
-    emailLogin: emailLoginMutation.mutateAsync,
+    register: registerMutation.mutateAsync,
+    login: loginMutation.mutateAsync,
     logout: logoutMutation.mutateAsync,
-    isRequestingOTP: requestOTPMutation.isPending,
-    isVerifyingOTP: verifyOTPMutation.isPending,
-    isLoggingIn: emailLoginMutation.isPending,
+    isRegistering: registerMutation.isPending,
+    isLoggingIn: loginMutation.isPending,
     isLoggingOut: logoutMutation.isPending,
-    otpError: requestOTPMutation.error,
-    verifyError: verifyOTPMutation.error,
-    loginError: emailLoginMutation.error,
+    registerError: registerMutation.error,
+    loginError: loginMutation.error,
   };
 }

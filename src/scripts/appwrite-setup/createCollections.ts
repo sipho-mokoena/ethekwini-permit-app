@@ -91,7 +91,9 @@ async function ensureApplicationsCollection() {
     );
 
     if (Array.isArray(collection.attributes)) {
-      for (const attribute of collection.attributes as Array<{ key?: string }>) {
+      for (const attribute of collection.attributes as Array<{
+        key?: string;
+      }>) {
         if (attribute?.key) {
           existingAttributeKeys.add(attribute.key);
         }
@@ -222,6 +224,16 @@ async function ensureDocumentsCollection() {
 
 async function ensureStorageBucket() {
   try {
+    await storage.getBucket(STORAGE_BUCKET_ID);
+    console.log("✓ Storage bucket already exists");
+    return;
+  } catch (error) {
+    if (!(error instanceof AppwriteException) || error.code !== 404) {
+      throw error;
+    }
+  }
+
+  try {
     await storage.createBucket(
       STORAGE_BUCKET_ID,
       "Application Files",
@@ -242,10 +254,22 @@ async function ensureStorageBucket() {
     );
     console.log("✓ Storage bucket created");
   } catch (error) {
-    if (!isConflict(error)) {
-      throw error;
+    if (isConflict(error)) {
+      console.log("✓ Storage bucket already exists");
+      return;
     }
-    console.log("✓ Storage bucket already exists");
+
+    if (
+      error instanceof AppwriteException &&
+      error.code === 403 &&
+      error.type === "additional_resource_not_allowed"
+    ) {
+      console.error(
+        `✗ Unable to create storage bucket "${STORAGE_BUCKET_ID}" because your Appwrite plan has reached its bucket limit. Delete an unused bucket or upgrade your plan, then rerun the setup.`,
+      );
+    }
+
+    throw error;
   }
 }
 
@@ -289,7 +313,9 @@ async function main() {
   console.log(
     `2. Add the admin user to the "${ADMINS_TEAM_ID}" team via the Console or REST API.`,
   );
-  console.log("3. Update your .env file with the correct frontend credentials.");
+  console.log(
+    "3. Update your .env file with the correct frontend credentials.",
+  );
 }
 
 main().catch((error) => {

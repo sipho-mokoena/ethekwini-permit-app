@@ -15,6 +15,8 @@ import type {
   ApplicationInput,
   Backend,
   FileUploadResult,
+  LoginInput,
+  RegisterInput,
   UploadedDocument,
   UploadedDocumentInput,
   User,
@@ -62,18 +64,22 @@ type UploadedDocumentRecord = Models.Document & {
 };
 
 class AppwriteBackend implements Backend {
-  private otpCooldowns = new Map<string, number>();
-
   private async enrichUser(
     rawUser: Models.User<Models.Preferences>,
   ): Promise<User> {
     const isAdmin = await this.isUserAdmin(rawUser.$id);
+    const prefs = (rawUser.prefs ?? {}) as Record<string, unknown>;
+    const prefPhone = typeof prefs.phone === "string" ? prefs.phone : undefined;
+    const prefOwnerName =
+      typeof prefs.ownerName === "string" ? prefs.ownerName : undefined;
+    const phone = (prefPhone ?? rawUser.phone ?? "").trim();
+    const ownerName = (rawUser.name?.trim() || prefOwnerName)?.trim();
 
     return {
       id: rawUser.$id,
-      phone: rawUser.phone ?? "",
-      ownerName: rawUser.name,
-      phoneVerified: rawUser.phoneVerification ?? false,
+      phone,
+      ownerName,
+      phoneVerified: true,
       isAdmin,
       email: rawUser.email,
     };
@@ -100,58 +106,56 @@ class AppwriteBackend implements Backend {
   }
 
   auth = {
-    requestPhoneOTP: async (
-      phone: string,
-    ): Promise<{ ok: boolean; cooldownUntil?: number; userId?: string }> => {
-      const formattedPhone = formatPhoneNumber(phone);
-      const cooldownUntil = this.otpCooldowns.get(formattedPhone);
-
-      if (cooldownUntil && cooldownUntil > Date.now()) {
-        return { ok: false, cooldownUntil };
+    register: async (input: RegisterInput): Promise<{ user: User }> => {
+      const email = input.email.trim();
+      const ownerName = input.ownerName.trim();
+      const phone = input.phone.trim();
+      try {
+        await account.create(ID.unique(), email, input.password, ownerName);
+      } catch (error) {
+        if (error instanceof Error) {
+          throw new Error(
+            error.message.includes("already")
+              ? "An account with this email already exists"
+              : "Failed to create account",
+          );
+        }
+        throw new Error("Failed to create account");
       }
 
       try {
-        const token = await account.createPhoneToken(
-          ID.unique(),
-          formattedPhone,
+        await account.createEmailPasswordSession(email, input.password);
+      } catch {
+        throw new Error(
+          "Account created but failed to sign in. Please try logging in.",
         );
-        const newCooldownUntil = Date.now() + 60_000;
-        this.otpCooldowns.set(formattedPhone, newCooldownUntil);
-        return {
-          ok: true,
-          userId: token.userId,
-          cooldownUntil: newCooldownUntil,
-        };
-      } catch {
-        throw new Error("Failed to send OTP");
       }
+
+      try {
+        await account.updatePrefs({
+          phone: formatPhoneNumber(phone),
+          ownerName,
+        });
+      } catch {
+        // Preference updates are non-critical
+      }
+
+      const rawUser = await account.get();
+      const user = await this.enrichUser(rawUser);
+      return { user };
     },
 
-    verifyOTP: async (input: {
-      userId: string;
-      code: string;
-    }): Promise<{ user: User; sessionToken?: string }> => {
+    login: async (credentials: LoginInput): Promise<{ user: User }> => {
       try {
-        const session = await account.createSession(input.userId, input.code);
-        const rawUser = await account.get();
-        const user = await this.enrichUser(rawUser);
-        return { user, sessionToken: session.$id };
-      } catch {
-        throw new Error("Invalid OTP");
-      }
-    },
-
-    createEmailSession: async (
-      email: string,
-      password: string,
-    ): Promise<{ user: User }> => {
-      try {
-        await account.createEmailPasswordSession(email, password);
+        await account.createEmailPasswordSession(
+          credentials.email.trim(),
+          credentials.password,
+        );
         const rawUser = await account.get();
         const user = await this.enrichUser(rawUser);
         return { user };
       } catch {
-        throw new Error("Invalid credentials");
+        throw new Error("Invalid email or password");
       }
     },
 

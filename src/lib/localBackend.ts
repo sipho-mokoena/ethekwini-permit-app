@@ -5,16 +5,22 @@ import type {
   ApplicationInput,
   Backend,
   FileUploadResult,
+  LoginInput,
+  RegisterInput,
   UploadedDocument,
   UploadedDocumentInput,
   User,
 } from "./types";
 import { formatPhoneNumber, generateId } from "./utils";
 
+interface LocalUserRecord extends User {
+  password: string;
+}
+
 interface SpazaDB extends DBSchema {
   users: {
     key: string;
-    value: User;
+    value: LocalUserRecord;
   };
   sessions: {
     key: string;
@@ -69,16 +75,42 @@ class LocalBackend implements Backend {
     const existingAdmin = await db.get("users", "admin-local");
 
     if (!existingAdmin) {
-      const adminUser: User = {
+      const adminUser: LocalUserRecord = {
         id: "admin-local",
         phone: "+27123456789",
         ownerName: "Local Admin",
         phoneVerified: true,
         isAdmin: true,
         email: "admin@local.test",
+        password: "adminpass",
       };
       await db.put("users", adminUser);
     }
+  }
+
+  private sanitizeUser(record: LocalUserRecord): User {
+    const { password: _password, ...rest } = record;
+    return rest;
+  }
+
+  private async findUserByEmail(
+    email: string,
+  ): Promise<LocalUserRecord | undefined> {
+    const db = await this.dbPromise;
+    const users = await db.getAll("users");
+    const normalized = email.trim().toLowerCase();
+    return users.find((u) => u.email?.toLowerCase() === normalized);
+  }
+
+  private async createSessionForUser(userId: string): Promise<void> {
+    const db = await this.dbPromise;
+    const sessionToken = generateId();
+    await db.put("sessions", {
+      sessionToken,
+      userId,
+      expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000,
+    });
+    this.setCurrentSession(sessionToken);
   }
 
   private getCurrentSession(): string | null {
@@ -101,7 +133,8 @@ class LocalBackend implements Backend {
       return null;
     }
 
-    return (await db.get("users", session.userId)) || null;
+    const record = await db.get("users", session.userId);
+    return record ? this.sanitizeUser(record) : null;
   }
 
   private async hasPermission(
@@ -114,129 +147,41 @@ class LocalBackend implements Backend {
   }
 
   auth = {
-    requestPhoneOTP: async (
-      phone: string,
-    ): Promise<{ ok: boolean; cooldownUntil?: number; userId?: string }> => {
-      const formattedPhone = formatPhoneNumber(phone);
-      const cooldownKey = `otpCooldown:${formattedPhone}`;
-      const cooldownUntil = localStorage.getItem(cooldownKey);
-
-      if (cooldownUntil && parseInt(cooldownUntil) > Date.now()) {
-        return { ok: false, cooldownUntil: parseInt(cooldownUntil) };
+    register: async (input: RegisterInput): Promise<{ user: User }> => {
+      const db = await this.dbPromise;
+      const existing = await this.findUserByEmail(input.email);
+      if (existing) {
+        throw new Error("An account with this email already exists");
       }
 
-      const db = await this.dbPromise;
-      const existingUser = (await db.getAll("users")).find(
-        (u) => u.phone === formattedPhone,
-      );
-      const userId = existingUser?.id ?? generateId();
+      const userId = generateId();
+      const normalizedEmail = input.email.trim().toLowerCase();
+      const record: LocalUserRecord = {
+        id: userId,
+        email: normalizedEmail,
+        ownerName: input.ownerName.trim(),
+        phone: formatPhoneNumber(input.phone.trim()),
+        phoneVerified: true,
+        isAdmin: false,
+        password: input.password,
+      };
 
-      // Simulate OTP sending
-      const newCooldownUntil = Date.now() + 60000; // 1 minute cooldown
-      localStorage.setItem(cooldownKey, newCooldownUntil.toString());
+      await db.put("users", record);
+      await this.createSessionForUser(userId);
 
-      // Store the OTP for verification (in real app this would be sent via SMS)
-      localStorage.setItem(`otp:${formattedPhone}`, "123456");
-      localStorage.setItem(
-        `otpExpiry:${formattedPhone}`,
-        (Date.now() + 300000).toString(),
-      ); // 5 minutes
-      localStorage.setItem(`otpUser:${formattedPhone}`, userId);
-      localStorage.setItem(`otpPhoneById:${userId}`, formattedPhone);
-
-  return { ok: true, userId, cooldownUntil: newCooldownUntil };
+      return { user: this.sanitizeUser(record) };
     },
 
-    verifyOTP: async (input: {
-      userId: string;
-      code: string;
-    }): Promise<{ user: User; sessionToken?: string }> => {
-      const formattedPhone = localStorage.getItem(
-        `otpPhoneById:${input.userId}`,
-      );
+    login: async (credentials: LoginInput): Promise<{ user: User }> => {
+      const record = await this.findUserByEmail(credentials.email);
 
-      if (!formattedPhone) {
-        throw new Error("OTP expired or not found");
+      if (!record || record.password !== credentials.password) {
+        throw new Error("Invalid email or password");
       }
 
-      const storedOTP = localStorage.getItem(`otp:${formattedPhone}`);
-      const otpExpiry = localStorage.getItem(`otpExpiry:${formattedPhone}`);
+      await this.createSessionForUser(record.id);
 
-      if (!storedOTP || !otpExpiry || parseInt(otpExpiry) < Date.now()) {
-        throw new Error("OTP expired or not found");
-      }
-
-      if (storedOTP !== input.code) {
-        throw new Error("Invalid OTP");
-      }
-
-      // Clean up OTP
-      localStorage.removeItem(`otp:${formattedPhone}`);
-      localStorage.removeItem(`otpExpiry:${formattedPhone}`);
-      localStorage.removeItem(`otpUser:${formattedPhone}`);
-      localStorage.removeItem(`otpPhoneById:${input.userId}`);
-
-      const db = await this.dbPromise;
-      let user = await db.get("users", input.userId);
-
-      if (!user) {
-        user = await db
-          .getAll("users")
-          .then((users) => users.find((u) => u.phone === formattedPhone));
-      }
-
-      if (!user) {
-        user = {
-          id: input.userId,
-          phone: formattedPhone,
-          phoneVerified: true,
-          isAdmin: false,
-        };
-        await db.put("users", user);
-      } else {
-        user.phoneVerified = true;
-        await db.put("users", user);
-      }
-
-      // Create session
-      const sessionToken = generateId();
-      await db.put("sessions", {
-        sessionToken,
-        userId: user.id,
-        expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000, // 7 days
-      });
-
-      this.setCurrentSession(sessionToken);
-
-      return { user, sessionToken };
-    },
-
-    createEmailSession: async (
-      email: string,
-      password: string,
-    ): Promise<{ user: User }> => {
-      if (email !== "admin@local.test" || password !== "adminpass") {
-        throw new Error("Invalid credentials");
-      }
-
-      const db = await this.dbPromise;
-      const user = await db.get("users", "admin-local");
-
-      if (!user) {
-        throw new Error("Admin user not found");
-      }
-
-      // Create session
-      const sessionToken = generateId();
-      await db.put("sessions", {
-        sessionToken,
-        userId: user.id,
-        expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000, // 7 days
-      });
-
-      this.setCurrentSession(sessionToken);
-
-      return { user };
+      return { user: this.sanitizeUser(record) };
     },
 
     getCurrentUser: async (): Promise<User | null> => {

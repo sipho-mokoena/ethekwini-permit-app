@@ -48,7 +48,7 @@ export function Layout() {
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center space-x-4">
               <Link to="/" className="text-xl font-bold">
-                eThekwini Spaza Registration
+                Spaza Portal
               </Link>
               {isLocalMode && (
                 <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">

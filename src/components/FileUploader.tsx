@@ -108,7 +108,9 @@ export function FileUploader({
   };
 
   const createPreview = (file: File): string | undefined => {
-    return file.type.startsWith("image/") ? URL.createObjectURL(file) : undefined;
+    return file.type.startsWith("image/")
+      ? URL.createObjectURL(file)
+      : undefined;
   };
 
   const validateFile = (file: File): string | null => {
@@ -283,7 +285,10 @@ export function FileUploader({
           }
         }}
         onKeyDown={(event) => {
-          if ((event.key === "Enter" || event.key === " ") && files.length < maxFiles) {
+          if (
+            (event.key === "Enter" || event.key === " ") &&
+            files.length < maxFiles
+          ) {
             event.preventDefault();
             fileInputRef.current?.click();
           }
