@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useState } from "react";
+import { Button } from "../components/ui/Button";
 import {
   Card,
   CardContent,
@@ -8,7 +9,6 @@ import {
   CardTitle,
 } from "../components/ui/Card";
 import { Input } from "../components/ui/Input";
-import { Button } from "../components/ui/Button";
 import { useAuth } from "../hooks/useAuth";
 import { isLocalMode } from "../lib/backend";
 
@@ -16,11 +16,12 @@ export const Route = createFileRoute("/verify")({
   component: VerifyPage,
   validateSearch: (search: Record<string, unknown>) => ({
     phone: search.phone as string,
+    userId: typeof search.userId === "string" ? search.userId : undefined,
   }),
 });
 
 function VerifyPage() {
-  const { phone } = Route.useSearch();
+  const { phone, userId } = Route.useSearch();
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
   const { verifyOTP, requestOTP, isVerifyingOTP, verifyError } = useAuth();
@@ -36,7 +37,12 @@ function VerifyPage() {
     }
 
     try {
-      const result = await verifyOTP(phone, code);
+      if (!userId) {
+        setError("Missing verification info. Please request a new code.");
+        return;
+      }
+
+      const result = await verifyOTP({ userId, code });
 
       if (result.user.isAdmin) {
         navigate({ to: "/admin/applications" });
@@ -50,7 +56,32 @@ function VerifyPage() {
 
   const handleResend = async () => {
     try {
-      await requestOTP(phone);
+      const newToken = await requestOTP(phone);
+
+      if (!newToken.ok) {
+        if (newToken.cooldownUntil) {
+          const seconds = Math.max(
+            0,
+            Math.ceil((newToken.cooldownUntil - Date.now()) / 1000),
+          );
+          setError(
+            `Please wait ${seconds} seconds before requesting another OTP`,
+          );
+        }
+        return;
+      }
+
+      const nextUserId = newToken.userId ?? userId;
+
+      if (!nextUserId) {
+        setError("Verification info missing. Please try again later.");
+        return;
+      }
+
+      navigate({
+        to: "/verify",
+        search: { phone, userId: nextUserId },
+      });
       setError("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to resend OTP");

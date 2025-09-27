@@ -25,7 +25,7 @@ export interface ApplicationInput {
   phoneNumber: string;
   tradeName: string;
   location?: string;
-  formData: Record<string, any>;
+  formData: Record<string, unknown>;
 }
 
 export interface UploadedDocument {
@@ -55,10 +55,9 @@ export interface Backend {
   auth: {
     requestPhoneOTP(
       phone: string,
-    ): Promise<{ ok: boolean; cooldownUntil?: number }>;
+    ): Promise<{ ok: boolean; cooldownUntil?: number; userId?: string }>;
     verifyOTP(
-      phone: string,
-      code: string,
+      input: { userId: string; code: string },
     ): Promise<{ user: User; sessionToken?: string }>;
     createEmailSession(
       email: string,

@@ -1,14 +1,15 @@
-import { openDB, DBSchema, IDBPDatabase } from "idb";
-import {
-  Backend,
-  User,
+import type { DBSchema, IDBPDatabase } from "idb";
+import { openDB } from "idb";
+import type {
   Application,
   ApplicationInput,
+  Backend,
+  FileUploadResult,
   UploadedDocument,
   UploadedDocumentInput,
-  FileUploadResult,
+  User,
 } from "./types";
-import { generateId, formatPhoneNumber } from "./utils";
+import { formatPhoneNumber, generateId } from "./utils";
 
 interface SpazaDB extends DBSchema {
   users: {
@@ -44,10 +45,10 @@ interface SpazaDB extends DBSchema {
 }
 
 class LocalBackend implements Backend {
-  private db: Promise<IDBPDatabase<SpazaDB>>;
+  private dbPromise: Promise<IDBPDatabase<SpazaDB>>;
 
   constructor() {
-    this.db = this.initDB();
+    this.dbPromise = this.initDB();
     this.seedAdminUser();
   }
 
@@ -64,7 +65,7 @@ class LocalBackend implements Backend {
   }
 
   private async seedAdminUser() {
-    const db = await this.db;
+    const db = await this.dbPromise;
     const existingAdmin = await db.get("users", "admin-local");
 
     if (!existingAdmin) {
@@ -93,7 +94,7 @@ class LocalBackend implements Backend {
   }
 
   private async getUserFromSession(sessionToken: string): Promise<User | null> {
-    const db = await this.db;
+    const db = await this.dbPromise;
     const session = await db.get("sessions", sessionToken);
 
     if (!session || session.expiresAt < Date.now()) {
@@ -107,7 +108,7 @@ class LocalBackend implements Backend {
     userId: string,
     ownerId: string,
   ): Promise<boolean> {
-    const db = await this.db;
+    const db = await this.dbPromise;
     const user = await db.get("users", userId);
     return user?.isAdmin || userId === ownerId;
   }
@@ -115,7 +116,7 @@ class LocalBackend implements Backend {
   auth = {
     requestPhoneOTP: async (
       phone: string,
-    ): Promise<{ ok: boolean; cooldownUntil?: number }> => {
+    ): Promise<{ ok: boolean; cooldownUntil?: number; userId?: string }> => {
       const formattedPhone = formatPhoneNumber(phone);
       const cooldownKey = `otpCooldown:${formattedPhone}`;
       const cooldownUntil = localStorage.getItem(cooldownKey);
@@ -123,6 +124,12 @@ class LocalBackend implements Backend {
       if (cooldownUntil && parseInt(cooldownUntil) > Date.now()) {
         return { ok: false, cooldownUntil: parseInt(cooldownUntil) };
       }
+
+      const db = await this.dbPromise;
+      const existingUser = (await db.getAll("users")).find(
+        (u) => u.phone === formattedPhone,
+      );
+      const userId = existingUser?.id ?? generateId();
 
       // Simulate OTP sending
       const newCooldownUntil = Date.now() + 60000; // 1 minute cooldown
@@ -134,15 +141,24 @@ class LocalBackend implements Backend {
         `otpExpiry:${formattedPhone}`,
         (Date.now() + 300000).toString(),
       ); // 5 minutes
+      localStorage.setItem(`otpUser:${formattedPhone}`, userId);
+      localStorage.setItem(`otpPhoneById:${userId}`, formattedPhone);
 
-      return { ok: true };
+  return { ok: true, userId, cooldownUntil: newCooldownUntil };
     },
 
-    verifyOTP: async (
-      phone: string,
-      code: string,
-    ): Promise<{ user: User; sessionToken?: string }> => {
-      const formattedPhone = formatPhoneNumber(phone);
+    verifyOTP: async (input: {
+      userId: string;
+      code: string;
+    }): Promise<{ user: User; sessionToken?: string }> => {
+      const formattedPhone = localStorage.getItem(
+        `otpPhoneById:${input.userId}`,
+      );
+
+      if (!formattedPhone) {
+        throw new Error("OTP expired or not found");
+      }
+
       const storedOTP = localStorage.getItem(`otp:${formattedPhone}`);
       const otpExpiry = localStorage.getItem(`otpExpiry:${formattedPhone}`);
 
@@ -150,22 +166,28 @@ class LocalBackend implements Backend {
         throw new Error("OTP expired or not found");
       }
 
-      if (storedOTP !== code) {
+      if (storedOTP !== input.code) {
         throw new Error("Invalid OTP");
       }
 
       // Clean up OTP
       localStorage.removeItem(`otp:${formattedPhone}`);
       localStorage.removeItem(`otpExpiry:${formattedPhone}`);
+      localStorage.removeItem(`otpUser:${formattedPhone}`);
+      localStorage.removeItem(`otpPhoneById:${input.userId}`);
 
-      const db = await this.db;
-      let user = await db
-        .getAll("users")
-        .then((users) => users.find((u) => u.phone === formattedPhone));
+      const db = await this.dbPromise;
+      let user = await db.get("users", input.userId);
+
+      if (!user) {
+        user = await db
+          .getAll("users")
+          .then((users) => users.find((u) => u.phone === formattedPhone));
+      }
 
       if (!user) {
         user = {
-          id: generateId(),
+          id: input.userId,
           phone: formattedPhone,
           phoneVerified: true,
           isAdmin: false,
@@ -197,7 +219,7 @@ class LocalBackend implements Backend {
         throw new Error("Invalid credentials");
       }
 
-      const db = await this.db;
+      const db = await this.dbPromise;
       const user = await db.get("users", "admin-local");
 
       if (!user) {
@@ -227,7 +249,7 @@ class LocalBackend implements Backend {
     logout: async (): Promise<void> => {
       const sessionToken = this.getCurrentSession();
       if (sessionToken) {
-        const db = await this.db;
+        const db = await this.dbPromise;
         await db.delete("sessions", sessionToken);
         this.clearCurrentSession();
       }
@@ -239,7 +261,21 @@ class LocalBackend implements Backend {
       const currentUser = await this.auth.getCurrentUser();
       if (!currentUser) throw new Error("Not authenticated");
 
-      const db = await this.db;
+      const db = await this.dbPromise;
+      const existing = await db.getAll("applications");
+      const hasDuplicate = existing.some(
+        (doc) =>
+          doc.ownerId === currentUser.id &&
+          doc.tradeName.toLowerCase() === app.tradeName.toLowerCase() &&
+          doc.status === "submitted",
+      );
+
+      if (hasDuplicate) {
+        throw new Error(
+          "You already have a submitted application for this trade name.",
+        );
+      }
+
       const application: Application = {
         id: generateId(),
         ownerId: currentUser.id,
@@ -266,7 +302,7 @@ class LocalBackend implements Backend {
       const currentUser = await this.auth.getCurrentUser();
       if (!currentUser) throw new Error("Not authenticated");
 
-      const db = await this.db;
+      const db = await this.dbPromise;
       let applications = await db.getAll("applications");
 
       // Filter by owner if not admin
@@ -298,7 +334,7 @@ class LocalBackend implements Backend {
       const currentUser = await this.auth.getCurrentUser();
       if (!currentUser) throw new Error("Not authenticated");
 
-      const db = await this.db;
+      const db = await this.dbPromise;
       const application = await db.get("applications", applicationId);
 
       if (!application) {
@@ -319,7 +355,7 @@ class LocalBackend implements Backend {
       const currentUser = await this.auth.getCurrentUser();
       if (!currentUser?.isAdmin) throw new Error("Admin access required");
 
-      const db = await this.db;
+      const db = await this.dbPromise;
       const application = await db.get("applications", applicationId);
 
       if (!application) {
@@ -339,7 +375,7 @@ class LocalBackend implements Backend {
       const currentUser = await this.auth.getCurrentUser();
       if (!currentUser) throw new Error("Not authenticated");
 
-      const db = await this.db;
+      const db = await this.dbPromise;
       const uploadedDoc: UploadedDocument = {
         id: generateId(),
         applicationId: doc.applicationId,
@@ -360,7 +396,7 @@ class LocalBackend implements Backend {
       const currentUser = await this.auth.getCurrentUser();
       if (!currentUser) throw new Error("Not authenticated");
 
-      const db = await this.db;
+      const db = await this.dbPromise;
       const docs = await db.getAll("uploaded_documents");
 
       return docs.filter((doc) => {
@@ -394,7 +430,7 @@ class LocalBackend implements Backend {
       const fileId = generateId();
       const filename = opts?.filename || file.name;
 
-      const db = await this.db;
+      const db = await this.dbPromise;
       await db.put("files", {
         fileId,
         ownerId,
@@ -414,7 +450,7 @@ class LocalBackend implements Backend {
         throw new Error("Permission denied");
       }
 
-      const db = await this.db;
+      const db = await this.dbPromise;
       const file = await db.get("files", fileId);
 
       if (!file) {

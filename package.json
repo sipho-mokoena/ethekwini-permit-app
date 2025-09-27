@@ -6,9 +6,11 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "lint": "eslint .",
+    "lint": "eslint ./src",
+    "ts:check": "tsc --noEmit",
     "format": "biome format --write ./src",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "appwrite:setup": "tsx src/scripts/appwrite-setup/createCollections.ts"
   },
   "dependencies": {
     "@appwrite.io/pink-icons": "^1.0.0",
@@ -19,9 +21,9 @@
     "@tanstack/router-devtools": "^1.132.11",
     "appwrite": "^17.0.2",
     "class-variance-authority": "^0.7.1",
-    "clsx": "^2.1.1",
-    "idb": "^8.0.3",
-    "lucide-react": "^0.544.0",
+  "clsx": "^2.1.1",
+  "idb": "^8.0.3",
+  "lucide-react": "^0.544.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "tailwind-merge": "^3.3.1",
@@ -39,7 +41,10 @@
     "eslint-plugin-react-hooks": "^5.0.0",
     "eslint-plugin-react-refresh": "^0.4.18",
     "globals": "^15.14.0",
+    "node-appwrite": "^14.1.0",
     "prettier": "3.5.3",
+    "typescript": "^5.9.2",
+    "tsx": "^4.19.2",
     "vite": "^6.1.0"
   }
 }

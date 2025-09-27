@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
+import { Button } from "../../components/ui/Button";
 import {
   Card,
   CardContent,
@@ -8,7 +9,6 @@ import {
   CardTitle,
 } from "../../components/ui/Card";
 import { Input } from "../../components/ui/Input";
-import { Button } from "../../components/ui/Button";
 import { useAuth } from "../../hooks/useAuth";
 import { isLocalMode } from "../../lib/backend";
 
@@ -36,7 +36,7 @@ function AdminLoginPage() {
     setError("");
 
     try {
-      const result = await emailLogin(email, password);
+      const result = await emailLogin({ email, password });
 
       if (result.user.isAdmin) {
         navigate({ to: "/admin/applications" });

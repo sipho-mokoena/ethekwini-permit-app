@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
+import { Button } from "../components/ui/Button";
 import {
   Card,
   CardContent,
@@ -8,10 +9,9 @@ import {
   CardTitle,
 } from "../components/ui/Card";
 import { Input } from "../components/ui/Input";
-import { Button } from "../components/ui/Button";
 import { useAuth } from "../hooks/useAuth";
-import { isValidPhoneNumber } from "../lib/utils";
 import { isLocalMode } from "../lib/backend";
+import { isValidPhoneNumber } from "../lib/utils";
 
 export const Route = createFileRoute("/login")({
   component: LoginPage,
@@ -20,8 +20,22 @@ export const Route = createFileRoute("/login")({
 function LoginPage() {
   const [phone, setPhone] = useState("");
   const [error, setError] = useState("");
+  const [cooldownUntil, setCooldownUntil] = useState<number | null>(null);
   const { requestOTP, isRequestingOTP, otpError, user } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!cooldownUntil) return;
+
+    const interval = window.setInterval(() => {
+      if (cooldownUntil <= Date.now()) {
+        setCooldownUntil(null);
+        window.clearInterval(interval);
+      }
+    }, 1000);
+
+    return () => window.clearInterval(interval);
+  }, [cooldownUntil]);
 
   useEffect(() => {
     if (user) {
@@ -46,11 +60,19 @@ function LoginPage() {
       const result = await requestOTP(phone);
 
       if (result.ok) {
-        navigate({ to: "/verify", search: { phone } });
+        if (!result.userId) {
+          setError("Failed to start verification. Please try again");
+          return;
+        }
+        navigate({
+          to: "/verify",
+          search: { phone, userId: result.userId },
+        });
       } else if (result.cooldownUntil) {
         const remainingTime = Math.ceil(
           (result.cooldownUntil - Date.now()) / 1000,
         );
+        setCooldownUntil(result.cooldownUntil);
         setError(
           `Please wait ${remainingTime} seconds before requesting another OTP`,
         );
@@ -87,6 +109,14 @@ function LoginPage() {
                 required
               />
             </div>
+
+            {cooldownUntil && (
+              <p className="text-xs text-muted-foreground">
+                You can request another code in
+                {` ${Math.max(0, Math.ceil((cooldownUntil - Date.now()) / 1000))} `}
+                seconds.
+              </p>
+            )}
 
             {(error || otpError) && (
               <p className="text-sm text-destructive">

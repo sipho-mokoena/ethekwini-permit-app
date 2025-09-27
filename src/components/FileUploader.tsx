@@ -1,8 +1,9 @@
-import React, { useState, useRef } from "react";
-import { Upload, X, FileText, Image } from "lucide-react";
+import { FileText, Image as ImageIcon, Upload, X } from "lucide-react";
+import { useEffect, useId, useRef, useState } from "react";
+import { backend } from "../lib/backend";
+import { cn, formatFileSize } from "../lib/utils";
 import { Button } from "./ui/Button";
 import { Progress } from "./ui/Progress";
-import { cn, formatFileSize } from "../lib/utils";
 
 interface FileUploadItem {
   file: File;
@@ -27,7 +28,7 @@ interface FileUploaderProps {
 export function FileUploader({
   onFilesUploaded,
   maxFiles = 5,
-  maxFileSize = 8 * 1024 * 1024, // 8MB
+  maxFileSize = 8 * 1024 * 1024,
   acceptedTypes = ["image/*", "application/pdf"],
   documentType,
   className,
@@ -35,6 +36,22 @@ export function FileUploader({
   const [files, setFiles] = useState<FileUploadItem[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const filesRef = useRef<FileUploadItem[]>([]);
+  const inputId = useId();
+
+  useEffect(() => {
+    filesRef.current = files;
+  }, [files]);
+
+  useEffect(() => {
+    return () => {
+      filesRef.current.forEach((item) => {
+        if (item.preview) {
+          URL.revokeObjectURL(item.preview);
+        }
+      });
+    };
+  }, []);
 
   const compressImage = async (file: File): Promise<File> => {
     if (!file.type.startsWith("image/") || file.size <= 2 * 1024 * 1024) {
@@ -43,40 +60,40 @@ export function FileUploader({
 
     return new Promise((resolve) => {
       const canvas = document.createElement("canvas");
-      const ctx = canvas.getContext("2d")!;
-      const img = new Image();
+      const ctx = canvas.getContext("2d");
+      const img = new window.Image();
 
       img.onload = () => {
-        // Calculate new dimensions
+        if (!ctx) {
+          resolve(file);
+          return;
+        }
+
         const maxWidth = 1920;
         const maxHeight = 1080;
         let { width, height } = img;
 
-        if (width > height) {
-          if (width > maxWidth) {
-            height = (height * maxWidth) / width;
-            width = maxWidth;
-          }
-        } else {
-          if (height > maxHeight) {
-            width = (width * maxHeight) / height;
-            height = maxHeight;
-          }
+        if (width > height && width > maxWidth) {
+          height = (height * maxWidth) / width;
+          width = maxWidth;
+        } else if (height > maxHeight) {
+          width = (width * maxHeight) / height;
+          height = maxHeight;
         }
 
         canvas.width = width;
         canvas.height = height;
-
-        // Draw and compress
         ctx.drawImage(img, 0, 0, width, height);
+
         canvas.toBlob(
           (blob) => {
             if (blob) {
-              const compressedFile = new File([blob], file.name, {
-                type: file.type,
-                lastModified: Date.now(),
-              });
-              resolve(compressedFile);
+              resolve(
+                new File([blob], file.name, {
+                  type: file.type,
+                  lastModified: Date.now(),
+                }),
+              );
             } else {
               resolve(file);
             }
@@ -91,10 +108,7 @@ export function FileUploader({
   };
 
   const createPreview = (file: File): string | undefined => {
-    if (file.type.startsWith("image/")) {
-      return URL.createObjectURL(file);
-    }
-    return undefined;
+    return file.type.startsWith("image/") ? URL.createObjectURL(file) : undefined;
   };
 
   const validateFile = (file: File): string | null => {
@@ -117,45 +131,40 @@ export function FileUploader({
   };
 
   const handleFiles = async (fileList: FileList) => {
-    const newFiles: FileUploadItem[] = [];
+    const newItems: FileUploadItem[] = [];
 
     for (
       let i = 0;
-      i < fileList.length && files.length + newFiles.length < maxFiles;
+      i < fileList.length && files.length + newItems.length < maxFiles;
       i++
     ) {
       const file = fileList[i];
       const error = validateFile(file);
 
       if (error) {
-        newFiles.push({
-          file,
-          progress: 0,
-          uploaded: false,
-          error,
-        });
-      } else {
-        const compressedFile = await compressImage(file);
-        const preview = createPreview(compressedFile);
-
-        newFiles.push({
-          file: compressedFile,
-          progress: 0,
-          uploaded: false,
-          preview,
-        });
+        newItems.push({ file, progress: 0, uploaded: false, error });
+        continue;
       }
+
+      const compressed = await compressImage(file);
+      newItems.push({
+        file: compressed,
+        progress: 0,
+        uploaded: false,
+        preview: createPreview(compressed),
+      });
     }
 
-    setFiles((prev) => [...prev, ...newFiles]);
+    if (newItems.length > 0) {
+      setFiles((prev) => [...prev, ...newItems]);
+    }
   };
 
   const uploadFile = async (index: number) => {
     const fileItem = files[index];
-    if (fileItem.uploaded || fileItem.error) return;
+    if (!fileItem || fileItem.uploaded || fileItem.error) return;
 
     try {
-      const { backend } = await import("../lib/backend");
       const currentUser = await backend.auth.getCurrentUser();
 
       if (!currentUser) {
@@ -170,42 +179,41 @@ export function FileUploader({
           documentType,
           progress: (progress) => {
             setFiles((prev) =>
-              prev.map((f, i) => (i === index ? { ...f, progress } : f)),
+              prev.map((item, idx) =>
+                idx === index ? { ...item, progress } : item,
+              ),
             );
           },
         },
       );
 
-      setFiles((prev) =>
-        prev.map((f, i) =>
-          i === index
-            ? { ...f, uploaded: true, fileId: result.fileId, progress: 100 }
-            : f,
-        ),
-      );
+      setFiles((prev) => {
+        const next = prev.map((item, idx) =>
+          idx === index
+            ? { ...item, uploaded: true, fileId: result.fileId, progress: 100 }
+            : item,
+        );
 
-      // Notify parent of successful upload
-      const uploadedFiles = files
-        .map((f, i) =>
-          i === index ? { ...f, uploaded: true, fileId: result.fileId } : f,
-        )
-        .filter((f) => f.uploaded && f.fileId)
-        .map((f) => ({
-          fileId: f.fileId!,
-          filename: f.file.name,
-          documentType,
-        }));
+        const uploadedItems = next
+          .filter((item) => item.uploaded && item.fileId)
+          .map((item) => ({
+            fileId: item.fileId as string,
+            filename: item.file.name,
+            documentType,
+          }));
 
-      onFilesUploaded(uploadedFiles);
+        onFilesUploaded(uploadedItems);
+        return next;
+      });
     } catch (error) {
       setFiles((prev) =>
-        prev.map((f, i) =>
-          i === index
+        prev.map((item, idx) =>
+          idx === index
             ? {
-                ...f,
+                ...item,
                 error: error instanceof Error ? error.message : "Upload failed",
               }
-            : f,
+            : item,
         ),
       );
     }
@@ -213,47 +221,74 @@ export function FileUploader({
 
   const removeFile = (index: number) => {
     const fileItem = files[index];
-    if (fileItem.preview) {
+    if (fileItem?.preview) {
       URL.revokeObjectURL(fileItem.preview);
     }
-    setFiles((prev) => prev.filter((_, i) => i !== index));
+
+    setFiles((prev) => {
+      const next = prev.filter((_, idx) => idx !== index);
+      const uploadedItems = next
+        .filter((item) => item.uploaded && item.fileId)
+        .map((item) => ({
+          fileId: item.fileId as string,
+          filename: item.file.name,
+          documentType,
+        }));
+
+      onFilesUploaded(uploadedItems);
+      return next;
+    });
   };
 
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
+  const handleDragOver = (event: React.DragEvent<HTMLLabelElement>) => {
+    event.preventDefault();
     setIsDragOver(true);
   };
 
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
+  const handleDragLeave = (event: React.DragEvent<HTMLLabelElement>) => {
+    event.preventDefault();
     setIsDragOver(false);
   };
 
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
+  const handleDrop = (event: React.DragEvent<HTMLLabelElement>) => {
+    event.preventDefault();
     setIsDragOver(false);
-    handleFiles(e.dataTransfer.files);
+    if (files.length >= maxFiles) return;
+    handleFiles(event.dataTransfer.files);
   };
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      handleFiles(e.target.files);
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files) {
+      handleFiles(event.target.files);
     }
   };
 
   return (
     <div className={cn("space-y-4", className)}>
-      <div
+      <label
+        htmlFor={inputId}
         className={cn(
-          "border-2 border-dashed rounded-lg p-6 text-center transition-colors",
+          "border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer",
           isDragOver
             ? "border-primary bg-primary/5"
             : "border-muted-foreground/25",
-          files.length >= maxFiles && "opacity-50 pointer-events-none",
+          files.length >= maxFiles && "opacity-50 cursor-not-allowed",
         )}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
+        onClick={(event) => {
+          if (files.length >= maxFiles) {
+            event.preventDefault();
+          }
+        }}
+        onKeyDown={(event) => {
+          if ((event.key === "Enter" || event.key === " ") && files.length < maxFiles) {
+            event.preventDefault();
+            fileInputRef.current?.click();
+          }
+        }}
+        aria-disabled={files.length >= maxFiles}
       >
         <Upload className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
         <p className="text-lg font-medium mb-2">
@@ -270,32 +305,33 @@ export function FileUploader({
         >
           Choose Files
         </Button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          multiple
-          accept={acceptedTypes.join(",")}
-          onChange={handleFileSelect}
-          className="hidden"
-        />
-      </div>
+      </label>
 
-      {files.length > 0 && (
+      <input
+        id={inputId}
+        ref={fileInputRef}
+        type="file"
+        multiple
+        accept={acceptedTypes.join(",")}
+        onChange={handleFileSelect}
+        className="hidden"
+      />
+
+      {files.length > 0 ? (
         <div className="space-y-3">
           {files.map((fileItem, index) => (
             <div
-              key={index}
+              key={fileItem.fileId ?? `${fileItem.file.name}-${index}`}
               className="flex items-center space-x-3 p-3 border rounded-lg"
             >
               <div className="flex-shrink-0">
                 {fileItem.preview ? (
-                  <img
-                    src={fileItem.preview}
-                    alt={fileItem.file.name}
-                    className="w-12 h-12 object-cover rounded"
+                  <div
+                    className="w-12 h-12 rounded bg-cover bg-center"
+                    style={{ backgroundImage: `url(${fileItem.preview})` }}
                   />
                 ) : fileItem.file.type.startsWith("image/") ? (
-                  <Image className="w-12 h-12 text-muted-foreground" />
+                  <ImageIcon className="w-12 h-12 text-muted-foreground" />
                 ) : (
                   <FileText className="w-12 h-12 text-muted-foreground" />
                 )}
@@ -342,13 +378,14 @@ export function FileUploader({
                 size="icon"
                 variant="ghost"
                 onClick={() => removeFile(index)}
+                aria-label={`Remove ${fileItem.file.name}`}
               >
                 <X className="h-4 w-4" />
               </Button>
             </div>
           ))}
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

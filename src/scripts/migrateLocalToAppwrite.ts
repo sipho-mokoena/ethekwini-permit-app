@@ -1,13 +1,13 @@
-import { openDB } from "idb";
 import {
-  Client,
   Account,
+  Client,
   Databases,
-  Storage,
   ID,
   Permission,
   Role,
+  Storage,
 } from "appwrite";
+import { openDB } from "idb";
 
 // Appwrite configuration
 const client = new Client();

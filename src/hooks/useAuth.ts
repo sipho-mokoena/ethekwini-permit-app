@@ -1,7 +1,5 @@
-import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { backend } from "../lib/backend";
-import { User } from "../lib/types";
 
 export function useAuth() {
   const queryClient = useQueryClient();
@@ -17,8 +15,8 @@ export function useAuth() {
   });
 
   const verifyOTPMutation = useMutation({
-    mutationFn: ({ phone, code }: { phone: string; code: string }) =>
-      backend.auth.verifyOTP(phone, code),
+    mutationFn: ({ userId, code }: { userId: string; code: string }) =>
+      backend.auth.verifyOTP({ userId, code }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["auth", "user"] });
     },

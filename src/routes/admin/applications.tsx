@@ -1,5 +1,7 @@
-import React from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { CheckCircle, Clock, Eye, FileText, XCircle } from "lucide-react";
+import React from "react";
+import { Button } from "../../components/ui/Button";
 import {
   Card,
   CardContent,
@@ -7,9 +9,7 @@ import {
   CardHeader,
   CardTitle,
 } from "../../components/ui/Card";
-import { Button } from "../../components/ui/Button";
 import { useApplications } from "../../hooks/useApplications";
-import { FileText, Clock, CheckCircle, XCircle, Eye } from "lucide-react";
 
 export const Route = createFileRoute("/admin/applications")({
   component: AdminApplicationsPage,

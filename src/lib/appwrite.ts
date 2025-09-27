@@ -1,27 +1,36 @@
+import type { Models } from "appwrite";
 import {
-  Client,
   Account,
+  Client,
   Databases,
-  Storage,
-  Teams,
   ID,
   Permission,
+  Query,
   Role,
+  Storage,
+  Teams,
 } from "appwrite";
-import {
-  Backend,
-  User,
+import type {
   Application,
   ApplicationInput,
+  Backend,
+  FileUploadResult,
   UploadedDocument,
   UploadedDocumentInput,
-  FileUploadResult,
+  User,
 } from "./types";
 import { formatPhoneNumber } from "./utils";
 
-const client = new Client()
-  .setEndpoint(import.meta.env.VITE_APPWRITE_ENDPOINT || "")
-  .setProject(import.meta.env.VITE_APPWRITE_PROJECT_ID || "");
+const endpoint = import.meta.env.VITE_APPWRITE_ENDPOINT ?? "";
+const projectId = import.meta.env.VITE_APPWRITE_PROJECT_ID ?? "";
+
+const client = new Client();
+if (endpoint) {
+  client.setEndpoint(endpoint);
+}
+if (projectId) {
+  client.setProject(projectId);
+}
 
 const account = new Account(client);
 const databases = new Databases(client);
@@ -32,21 +41,59 @@ const DATABASE_ID = "spaza-db";
 const APPLICATIONS_COLLECTION_ID = "applications";
 const UPLOADED_DOCUMENTS_COLLECTION_ID = "uploaded_documents";
 const STORAGE_BUCKET_ID = "application-files";
+const ADMINS_TEAM_ID = "admins";
+
+type ApplicationDocument = Models.Document & {
+  ownerId: string;
+  ownerName: string;
+  phoneNumber: string;
+  tradeName: string;
+  location?: string;
+  formData: string;
+  status: "submitted" | "reviewing" | "approved" | "rejected";
+};
+
+type UploadedDocumentRecord = Models.Document & {
+  applicationId: string;
+  ownerId: string;
+  documentType: string;
+  fileId: string;
+  filename: string;
+};
 
 class AppwriteBackend implements Backend {
   private otpCooldowns = new Map<string, number>();
 
-  private async getCurrentUser(): Promise<User | null> {
+  private async enrichUser(
+    rawUser: Models.User<Models.Preferences>,
+  ): Promise<User> {
+    const isAdmin = await this.isUserAdmin(rawUser.$id);
+
+    return {
+      id: rawUser.$id,
+      phone: rawUser.phone ?? "",
+      ownerName: rawUser.name,
+      phoneVerified: rawUser.phoneVerification ?? false,
+      isAdmin,
+      email: rawUser.email,
+    };
+  }
+
+  private async isUserAdmin(userId: string): Promise<boolean> {
     try {
-      const user = await account.get();
-      return {
-        id: user.$id,
-        phone: user.phone || "",
-        ownerName: user.name,
-        phoneVerified: user.phoneVerification,
-        isAdmin: false, // Will be determined by team membership
-        email: user.email,
-      };
+      const memberships = await teams.listMemberships(ADMINS_TEAM_ID, [
+        Query.equal("userId", userId),
+      ]);
+      return memberships.total > 0;
+    } catch {
+      return false;
+    }
+  }
+
+  private async getAuthedUser(): Promise<User | null> {
+    try {
+      const rawUser = await account.get();
+      return await this.enrichUser(rawUser);
     } catch {
       return null;
     }
@@ -55,7 +102,7 @@ class AppwriteBackend implements Backend {
   auth = {
     requestPhoneOTP: async (
       phone: string,
-    ): Promise<{ ok: boolean; cooldownUntil?: number }> => {
+    ): Promise<{ ok: boolean; cooldownUntil?: number; userId?: string }> => {
       const formattedPhone = formatPhoneNumber(phone);
       const cooldownUntil = this.otpCooldowns.get(formattedPhone);
 
@@ -64,31 +111,32 @@ class AppwriteBackend implements Backend {
       }
 
       try {
-        await account.createPhoneToken(ID.unique(), formattedPhone);
-        const newCooldownUntil = Date.now() + 60000; // 1 minute cooldown
+        const token = await account.createPhoneToken(
+          ID.unique(),
+          formattedPhone,
+        );
+        const newCooldownUntil = Date.now() + 60_000;
         this.otpCooldowns.set(formattedPhone, newCooldownUntil);
-        return { ok: true };
-      } catch (error) {
+        return {
+          ok: true,
+          userId: token.userId,
+          cooldownUntil: newCooldownUntil,
+        };
+      } catch {
         throw new Error("Failed to send OTP");
       }
     },
 
-    verifyOTP: async (
-      phone: string,
-      code: string,
-    ): Promise<{ user: User; sessionToken?: string }> => {
-      const formattedPhone = formatPhoneNumber(phone);
-
+    verifyOTP: async (input: {
+      userId: string;
+      code: string;
+    }): Promise<{ user: User; sessionToken?: string }> => {
       try {
-        const session = await account.createSession(ID.unique(), code);
-        const user = await this.getCurrentUser();
-
-        if (!user) {
-          throw new Error("Failed to get user after verification");
-        }
-
+        const session = await account.createSession(input.userId, input.code);
+        const rawUser = await account.get();
+        const user = await this.enrichUser(rawUser);
         return { user, sessionToken: session.$id };
-      } catch (error) {
+      } catch {
         throw new Error("Invalid OTP");
       }
     },
@@ -99,49 +147,23 @@ class AppwriteBackend implements Backend {
     ): Promise<{ user: User }> => {
       try {
         await account.createEmailPasswordSession(email, password);
-        const user = await this.getCurrentUser();
-
-        if (!user) {
-          throw new Error("Failed to get user after login");
-        }
-
-        // Check if user is admin
-        try {
-          const memberships = await teams.listMemberships("admins");
-          user.isAdmin = memberships.memberships.some(
-            (m) => m.userId === user.id,
-          );
-        } catch {
-          user.isAdmin = false;
-        }
-
+        const rawUser = await account.get();
+        const user = await this.enrichUser(rawUser);
         return { user };
-      } catch (error) {
+      } catch {
         throw new Error("Invalid credentials");
       }
     },
 
     getCurrentUser: async (): Promise<User | null> => {
-      const user = await this.getCurrentUser();
-      if (user) {
-        // Check admin status
-        try {
-          const memberships = await teams.listMemberships("admins");
-          user.isAdmin = memberships.memberships.some(
-            (m) => m.userId === user.id,
-          );
-        } catch {
-          user.isAdmin = false;
-        }
-      }
-      return user;
+      return await this.getAuthedUser();
     },
 
     logout: async (): Promise<void> => {
       try {
         await account.deleteSession("current");
       } catch {
-        // Ignore errors during logout
+        /* noop */
       }
     },
   };
@@ -151,7 +173,23 @@ class AppwriteBackend implements Backend {
       const currentUser = await this.auth.getCurrentUser();
       if (!currentUser) throw new Error("Not authenticated");
 
-      const doc = await databases.createDocument(
+      const duplicates = await databases.listDocuments<ApplicationDocument>(
+        DATABASE_ID,
+        APPLICATIONS_COLLECTION_ID,
+        [
+          Query.equal("ownerId", currentUser.id),
+          Query.equal("tradeName", app.tradeName.trim()),
+          Query.equal("status", "submitted"),
+        ],
+      );
+
+      if (duplicates.total > 0) {
+        throw new Error(
+          "You already have a submitted application for this trade name.",
+        );
+      }
+
+      const doc = await databases.createDocument<ApplicationDocument>(
         DATABASE_ID,
         APPLICATIONS_COLLECTION_ID,
         ID.unique(),
@@ -166,7 +204,7 @@ class AppwriteBackend implements Backend {
         },
         [
           Permission.read(Role.user(currentUser.id)),
-          Permission.read(Role.team("admins")),
+          Permission.read(Role.team(ADMINS_TEAM_ID)),
         ],
       );
 
@@ -193,15 +231,23 @@ class AppwriteBackend implements Backend {
       const currentUser = await this.auth.getCurrentUser();
       if (!currentUser) throw new Error("Not authenticated");
 
-      const queries = [];
+      const queries: string[] = [Query.orderDesc("$createdAt")];
 
       if (!currentUser.isAdmin && !filter?.ownerId) {
-        queries.push(`ownerId="${currentUser.id}"`);
+        queries.push(Query.equal("ownerId", currentUser.id));
       } else if (filter?.ownerId) {
-        queries.push(`ownerId="${filter.ownerId}"`);
+        queries.push(Query.equal("ownerId", filter.ownerId));
       }
 
-      const result = await databases.listDocuments(
+      if (typeof filter?.limit === "number") {
+        queries.push(Query.limit(filter.limit));
+      }
+
+      if (typeof filter?.offset === "number") {
+        queries.push(Query.offset(filter.offset));
+      }
+
+      const result = await databases.listDocuments<ApplicationDocument>(
         DATABASE_ID,
         APPLICATIONS_COLLECTION_ID,
         queries,
@@ -224,7 +270,7 @@ class AppwriteBackend implements Backend {
     },
 
     getApplication: async (applicationId: string): Promise<Application> => {
-      const doc = await databases.getDocument(
+      const doc = await databases.getDocument<ApplicationDocument>(
         DATABASE_ID,
         APPLICATIONS_COLLECTION_ID,
         applicationId,
@@ -248,7 +294,7 @@ class AppwriteBackend implements Backend {
       applicationId: string,
       status: "reviewing" | "approved" | "rejected",
     ): Promise<Application> => {
-      const doc = await databases.updateDocument(
+      const doc = await databases.updateDocument<ApplicationDocument>(
         DATABASE_ID,
         APPLICATIONS_COLLECTION_ID,
         applicationId,
@@ -272,7 +318,7 @@ class AppwriteBackend implements Backend {
     createUploadedDocument: async (
       doc: UploadedDocumentInput,
     ): Promise<UploadedDocument> => {
-      const result = await databases.createDocument(
+      const result = await databases.createDocument<UploadedDocumentRecord>(
         DATABASE_ID,
         UPLOADED_DOCUMENTS_COLLECTION_ID,
         ID.unique(),
@@ -285,7 +331,7 @@ class AppwriteBackend implements Backend {
         },
         [
           Permission.read(Role.user(doc.ownerId)),
-          Permission.read(Role.team("admins")),
+          Permission.read(Role.team(ADMINS_TEAM_ID)),
         ],
       );
 
@@ -303,10 +349,13 @@ class AppwriteBackend implements Backend {
     listUploadedDocuments: async (
       applicationId: string,
     ): Promise<UploadedDocument[]> => {
-      const result = await databases.listDocuments(
+      const result = await databases.listDocuments<UploadedDocumentRecord>(
         DATABASE_ID,
         UPLOADED_DOCUMENTS_COLLECTION_ID,
-        [`applicationId="${applicationId}"`],
+        [
+          Query.equal("applicationId", applicationId),
+          Query.orderAsc("$createdAt"),
+        ],
       );
 
       return result.documents.map((doc) => ({
@@ -336,15 +385,19 @@ class AppwriteBackend implements Backend {
 
       await storage.createFile(STORAGE_BUCKET_ID, fileId, file, [
         Permission.read(Role.user(ownerId)),
-        Permission.read(Role.team("admins")),
+        Permission.read(Role.team(ADMINS_TEAM_ID)),
       ]);
+
+      if (opts?.progress) {
+        opts.progress(100);
+      }
 
       return { fileId, filename };
     },
 
-    getFileURL: async (fileId: string, ownerId: string): Promise<string> => {
-      const result = storage.getFileView(STORAGE_BUCKET_ID, fileId);
-      return result.href;
+    getFileURL: async (fileId: string, _ownerId: string): Promise<string> => {
+      const url = storage.getFileView(STORAGE_BUCKET_ID, fileId);
+      return url.toString();
     },
   };
 }

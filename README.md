@@ -1,398 +1,109 @@
-import { openDB, DBSchema, IDBPDatabase } from 'idb'
-import { Backend, User, Application, ApplicationInput, UploadedDocument, UploadedDocumentInput, FileUploadResult } from './types'
-import { generateId, formatPhoneNumber } from './utils'
+# eThekwini Spaza Permit PWA
 
-interface SpazaDB extends DBSchema {
-  users: {
-    key: string
-    value: User
-  }
-  sessions: {
-    key: string
-    value: {
-      sessionToken: string
-      userId: string
-      expiresAt: number
-    }
-  }
-  applications: {
-    key: string
-    value: Application
-  }
-  uploaded_documents: {
-    key: string
-    value: UploadedDocument
-  }
-  files: {
-    key: string
-    value: {
-      fileId: string
-      ownerId: string
-      filename: string
-      blob: Blob
-      uploadedAt: string
-    }
-  }
-}
+A lightweight progressive web application that lets spaza shop owners in eThekwini submit permit applications from their mobile phones. The app supports both a fully local development mode (IndexedDB) and a production mode backed by Appwrite.
 
-class LocalBackend implements Backend {
-  private db: Promise<IDBPDatabase<SpazaDB>>
+## Features
 
-  constructor() {
-    this.db = this.initDB()
-    this.seedAdminUser()
-  }
+- 📱 Responsive React 19 UI built with Vite and Tailwind CSS 4
+- 🔐 Phone OTP login for applicants plus email/password login for administrators
+- 🗂️ Application capture with document checklist and file uploads
+- 🪪 Document management with upload progress and previews
+- 📥 Admin dashboard for reviewing and approving submissions
+- 💾 IndexedDB-powered local backend for offline-friendly development
+- ☁️ Appwrite integration for auth, databases, storage, and team management
+- ⚙️ Typed data layer with interchangeable backend implementations
 
-  private async initDB(): Promise<IDBPDatabase<SpazaDB>> {
-    return openDB<SpazaDB>('spaza-db', 1, {
-      upgrade(db) {
-        db.createObjectStore('users', { keyPath: 'id' })
-        db.createObjectStore('sessions', { keyPath: 'sessionToken' })
-        db.createObjectStore('applications', { keyPath: 'id' })
-        db.createObjectStore('uploaded_documents', { keyPath: 'id' })
-        db.createObjectStore('files', { keyPath: 'fileId' })
-      },
-    })
-  }
+## Tech Stack
 
-  private async seedAdminUser() {
-    const db = await this.db
-    const existingAdmin = await db.get('users', 'admin-local')
-    
-    if (!existingAdmin) {
-      const adminUser: User = {
-        id: 'admin-local',
-        phone: '+27123456789',
-        ownerName: 'Local Admin',
-        phoneVerified: true,
-        isAdmin: true,
-        email: 'admin@local.test'
-      }
-      await db.put('users', adminUser)
-    }
-  }
+- React 19 + Vite 6
+- TypeScript strict mode
+- TanStack Router & TanStack Query
+- Tailwind CSS 4 + shadcn-inspired UI primitives
+- Appwrite Web SDK (client) & Node SDK (provisioning)
+- IndexedDB via `idb` for the local backend
 
-  private getCurrentSession(): string | null {
-    return localStorage.getItem('sessionToken')
-  }
+## Prerequisites
 
-  private setCurrentSession(token: string) {
-    localStorage.setItem('sessionToken', token)
-  }
+- Node.js 20+
+- pnpm 9+
+- Appwrite instance (self-hosted or Cloud) for production mode
 
-  private clearCurrentSession() {
-    localStorage.removeItem('sessionToken')
-  }
+## Getting Started
 
-  private async getUserFromSession(sessionToken: string): Promise<User | null> {
-    const db = await this.db
-    const session = await db.get('sessions', sessionToken)
-    
-    if (!session || session.expiresAt < Date.now()) {
-      return null
-    }
-    
-    return await db.get('users', session.userId) || null
-  }
+```powershell
+pnpm install
+pnpm dev
+```
 
-  private async hasPermission(userId: string, ownerId: string): Promise<boolean> {
-    const db = await this.db
-    const user = await db.get('users', userId)
-    return user?.isAdmin || userId === ownerId
-  }
+The dev server runs on <http://localhost:5173>. By default the app boots in local mode using IndexedDB. Set `VITE_USE_LOCALDB=false` in your `.env` to target Appwrite.
 
-  auth = {
-    requestPhoneOTP: async (phone: string): Promise<{ ok: boolean; cooldownUntil?: number }> => {
-      const formattedPhone = formatPhoneNumber(phone)
-      const cooldownKey = `otpCooldown:${formattedPhone}`
-      const cooldownUntil = localStorage.getItem(cooldownKey)
-      
-      if (cooldownUntil && parseInt(cooldownUntil) > Date.now()) {
-        return { ok: false, cooldownUntil: parseInt(cooldownUntil) }
-      }
-      
-      // Simulate OTP sending
-      const newCooldownUntil = Date.now() + 60000 // 1 minute cooldown
-      localStorage.setItem(cooldownKey, newCooldownUntil.toString())
-      
-      // Store the OTP for verification (in real app this would be sent via SMS)
-      localStorage.setItem(`otp:${formattedPhone}`, '123456')
-      localStorage.setItem(`otpExpiry:${formattedPhone}`, (Date.now() + 300000).toString()) // 5 minutes
-      
-      return { ok: true }
-    },
+### Environment Variables
 
-    verifyOTP: async (phone: string, code: string): Promise<{ user: User; sessionToken?: string }> => {
-      const formattedPhone = formatPhoneNumber(phone)
-      const storedOTP = localStorage.getItem(`otp:${formattedPhone}`)
-      const otpExpiry = localStorage.getItem(`otpExpiry:${formattedPhone}`)
-      
-      if (!storedOTP || !otpExpiry || parseInt(otpExpiry) < Date.now()) {
-        throw new Error('OTP expired or not found')
-      }
-      
-      if (storedOTP !== code) {
-        throw new Error('Invalid OTP')
-      }
-      
-      // Clean up OTP
-      localStorage.removeItem(`otp:${formattedPhone}`)
-      localStorage.removeItem(`otpExpiry:${formattedPhone}`)
-      
-      const db = await this.db
-      let user = await db.getAll('users').then(users => 
-        users.find(u => u.phone === formattedPhone)
-      )
-      
-      if (!user) {
-        user = {
-          id: generateId(),
-          phone: formattedPhone,
-          phoneVerified: true,
-          isAdmin: false
-        }
-        await db.put('users', user)
-      } else {
-        user.phoneVerified = true
-        await db.put('users', user)
-      }
-      
-      // Create session
-      const sessionToken = generateId()
-      await db.put('sessions', {
-        sessionToken,
-        userId: user.id,
-        expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000 // 7 days
-      })
-      
-      this.setCurrentSession(sessionToken)
-      
-      return { user, sessionToken }
-    },
+Create a `.env` file based on `.env.example`:
 
-    createEmailSession: async (email: string, password: string): Promise<{ user: User }> => {
-      if (email !== 'admin@local.test' || password !== 'adminpass') {
-        throw new Error('Invalid credentials')
-      }
-      
-      const db = await this.db
-      const user = await db.get('users', 'admin-local')
-      
-      if (!user) {
-        throw new Error('Admin user not found')
-      }
-      
-      // Create session
-      const sessionToken = generateId()
-      await db.put('sessions', {
-        sessionToken,
-        userId: user.id,
-        expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000 // 7 days
-      })
-      
-      this.setCurrentSession(sessionToken)
-      
-      return { user }
-    },
+```dotenv
+VITE_USE_LOCALDB=true
+VITE_APPWRITE_ENDPOINT=https://your-appwrite-endpoint.com/v1
+VITE_APPWRITE_PROJECT_ID=your-project-id
+VITE_APPWRITE_PROJECT_NAME=eThekwini Spaza Registration
+APPWRITE_API_KEY=your-appwrite-api-key
+```
 
-    getCurrentUser: async (): Promise<User | null> => {
-      const sessionToken = this.getCurrentSession()
-      if (!sessionToken) return null
-      
-      return await this.getUserFromSession(sessionToken)
-    },
+- `VITE_*` variables are used in the browser bundle.
+- `APPWRITE_API_KEY` is only used by the provisioning script and should have admin-level access.
 
-    logout: async (): Promise<void> => {
-      const sessionToken = this.getCurrentSession()
-      if (sessionToken) {
-        const db = await this.db
-        await db.delete('sessions', sessionToken)
-        this.clearCurrentSession()
-      }
-    }
-  }
+### Switching Backends
 
-  db = {
-    createApplication: async (app: ApplicationInput): Promise<Application> => {
-      const currentUser = await this.auth.getCurrentUser()
-      if (!currentUser) throw new Error('Not authenticated')
-      
-      const db = await this.db
-      const application: Application = {
-        id: generateId(),
-        ownerId: currentUser.id,
-        ownerName: app.ownerName,
-        phoneNumber: app.phoneNumber,
-        tradeName: app.tradeName,
-        location: app.location,
-        formData: JSON.stringify(app.formData),
-        status: 'submitted',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      }
-      
-      await db.put('applications', application)
-      return application
-    },
+| Mode              | How                                   | Notes |
+|-------------------|----------------------------------------|-------|
+| Local development | `VITE_USE_LOCALDB=true` (default)      | OTP code is always `123456`. Admin login uses `admin@local.test / adminpass`. |
+| Appwrite          | `VITE_USE_LOCALDB=false` + valid creds | Uses Appwrite Phone OTP, storage uploads, database rules, and team-based admin access. |
 
-    listApplications: async (filter?: {
-      ownerId?: string
-      offset?: number
-      limit?: number
-      sort?: string
-    }): Promise<{ documents: Application[] }> => {
-      const currentUser = await this.auth.getCurrentUser()
-      if (!currentUser) throw new Error('Not authenticated')
-      
-      const db = await this.db
-      let applications = await db.getAll('applications')
-      
-      // Filter by owner if not admin
-      if (!currentUser.isAdmin) {
-        applications = applications.filter(app => app.ownerId === currentUser.id)
-      } else if (filter?.ownerId) {
-        applications = applications.filter(app => app.ownerId === filter.ownerId)
-      }
-      
-      // Sort by createdAt desc by default
-      applications.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-      
-      // Apply pagination
-      const offset = filter?.offset || 0
-      const limit = filter?.limit || 100
-      applications = applications.slice(offset, offset + limit)
-      
-      return { documents: applications }
-    },
+## Provisioning Appwrite
 
-    getApplication: async (applicationId: string): Promise<Application> => {
-      const currentUser = await this.auth.getCurrentUser()
-      if (!currentUser) throw new Error('Not authenticated')
-      
-      const db = await this.db
-      const application = await db.get('applications', applicationId)
-      
-      if (!application) {
-        throw new Error('Application not found')
-      }
-      
-      if (!await this.hasPermission(currentUser.id, application.ownerId)) {
-        throw new Error('Permission denied')
-      }
-      
-      return application
-    },
+Run the setup script once per project/tenant to create the database, collections, bucket, and admin team:
 
-    updateApplicationStatus: async (
-      applicationId: string,
-      status: 'reviewing' | 'approved' | 'rejected'
-    ): Promise<Application> => {
-      const currentUser = await this.auth.getCurrentUser()
-      if (!currentUser?.isAdmin) throw new Error('Admin access required')
-      
-      const db = await this.db
-      const application = await db.get('applications', applicationId)
-      
-      if (!application) {
-        throw new Error('Application not found')
-      }
-      
-      application.status = status
-      application.updatedAt = new Date().toISOString()
-      
-      await db.put('applications', application)
-      return application
-    },
+```powershell
+pnpm appwrite:setup
+```
 
-    createUploadedDocument: async (doc: UploadedDocumentInput): Promise<UploadedDocument> => {
-      const currentUser = await this.auth.getCurrentUser()
-      if (!currentUser) throw new Error('Not authenticated')
-      
-      const db = await this.db
-      const uploadedDoc: UploadedDocument = {
-        id: generateId(),
-        applicationId: doc.applicationId,
-        ownerId: doc.ownerId,
-        documentType: doc.documentType,
-        fileId: doc.fileId,
-        filename: doc.filename,
-        uploadedAt: new Date().toISOString()
-      }
-      
-      await db.put('uploaded_documents', uploadedDoc)
-      return uploadedDoc
-    },
+The script requires the following permissions on the API key:
 
-    listUploadedDocuments: async (applicationId: string): Promise<UploadedDocument[]> => {
-      const currentUser = await this.auth.getCurrentUser()
-      if (!currentUser) throw new Error('Not authenticated')
-      
-      const db = await this.db
-      const docs = await db.getAll('uploaded_documents')
-      
-      return docs.filter(doc => {
-        if (doc.applicationId !== applicationId) return false
-        return currentUser.isAdmin || doc.ownerId === currentUser.id
-      })
-    }
-  }
+- Databases: read/write
+- Storage: read/write
+- Teams: read/write
 
-  storage = {
-    uploadFile: async (
-      file: File,
-      ownerId: string,
-      opts?: {
-        filename?: string
-        documentType?: string
-        progress?: (p: number) => void
-      }
-    ): Promise<FileUploadResult> => {
-      const currentUser = await this.auth.getCurrentUser()
-      if (!currentUser) throw new Error('Not authenticated')
-      
-      // Simulate upload progress
-      if (opts?.progress) {
-        for (let i = 0; i <= 100; i += 10) {
-          await new Promise(resolve => setTimeout(resolve, 50))
-          opts.progress(i)
-        }
-      }
-      
-      const fileId = generateId()
-      const filename = opts?.filename || file.name
-      
-      const db = await this.db
-      await db.put('files', {
-        fileId,
-        ownerId,
-        filename,
-        blob: file,
-        uploadedAt: new Date().toISOString()
-      })
-      
-      return { fileId, filename }
-    },
+After running:
 
-    getFileURL: async (fileId: string, ownerId: string): Promise<string> => {
-      const currentUser = await this.auth.getCurrentUser()
-      if (!currentUser) throw new Error('Not authenticated')
-      
-      if (!await this.hasPermission(currentUser.id, ownerId)) {
-        throw new Error('Permission denied')
-      }
-      
-      const db = await this.db
-      const file = await db.get('files', fileId)
-      
-      if (!file) {
-        throw new Error('File not found')
-      }
-      
-      return URL.createObjectURL(file.blob)
-    }
-  }
-}
+1. Create an admin user in the Appwrite Console.
+2. Add the user to the `admins` team.
+3. Update any production `.env` files with the endpoint, project ID, and bucket name if you change defaults.
 
-export function createLocalBackend(): Backend {
-  return new LocalBackend()
-}
+## Handy Scripts
+
+| Command | Purpose |
+|---------|---------|
+| `pnpm dev` | Start the Vite dev server |
+| `pnpm build` | Build the production bundle |
+| `pnpm preview` | Preview the production build |
+| `pnpm lint` | Run ESLint on the React source files |
+| `pnpm ts:check` | Type-check the whole project |
+| `pnpm format` | Format code in `src/` using Biome |
+| `pnpm appwrite:setup` | Provision Appwrite collections, bucket, and team |
+
+## Testing the Flow
+
+1. Run `pnpm dev`.
+2. Visit `/login` and enter a South African phone number.
+3. In local mode, use OTP `123456`; in Appwrite mode, read the code from your SMS provider.
+4. Complete the document checklist and upload required files (images and PDFs supported up to 8 MB).
+5. Submit the application and review it from `/dashboard` or `/admin/applications` if logged in as an admin.
+
+## Troubleshooting
+
+- **Storage uploads fail in Appwrite mode**: Ensure the bucket permissions allow the user and `admins` team to create/read files.
+- **Phone OTP throttling**: The app enforces a 60-second cooldown client-side and relies on Appwrite server-side limits.
+- **Running the provisioning script**: If you see `Cannot find module 'node-appwrite'`, reinstall dependencies with `pnpm install`.
+
+Feel free to open issues or suggestions to improve the MVP! 🚀
+

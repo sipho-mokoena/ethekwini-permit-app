@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from "react";
-import { Outlet, Link, useLocation } from "@tanstack/react-router";
-import { LogOut, Menu, X, Wifi, WifiOff } from "lucide-react";
-import { Button } from "./ui/Button";
+import { Link, Outlet, useLocation } from "@tanstack/react-router";
+import { LogOut, Menu, Wifi, WifiOff, X } from "lucide-react";
+import React, { useEffect, useState } from "react";
 import { useAuth } from "../hooks/useAuth";
 import { isLocalMode } from "../lib/backend";
+import { Button } from "./ui/Button";
 
 export function Layout() {
   const { user, logout } = useAuth();

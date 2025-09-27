@@ -1,5 +1,9 @@
-import React, { useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { CheckCircle, FileText, Send, Upload } from "lucide-react";
+import type React from "react";
+import { useState } from "react";
+import { FileUploader } from "../components/FileUploader";
+import { Button } from "../components/ui/Button";
 import {
   Card,
   CardContent,
@@ -8,14 +12,11 @@ import {
   CardTitle,
 } from "../components/ui/Card";
 import { Input } from "../components/ui/Input";
-import { Button } from "../components/ui/Button";
-import { FileUploader } from "../components/FileUploader";
-import { useAuth } from "../hooks/useAuth";
 import {
   useCreateApplication,
   useCreateUploadedDocument,
 } from "../hooks/useApplications";
-import { CheckCircle, FileText, Upload, Send } from "lucide-react";
+import { useAuth } from "../hooks/useAuth";
 
 export const Route = createFileRoute("/apply")({
   component: ApplyPage,

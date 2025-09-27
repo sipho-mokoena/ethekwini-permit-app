@@ -1,5 +1,14 @@
-import React from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
+import {
+  ArrowLeft,
+  CheckCircle,
+  Clock,
+  Download,
+  Eye,
+  XCircle,
+} from "lucide-react";
+import React from "react";
+import { Button } from "../../components/ui/Button";
 import {
   Card,
   CardContent,
@@ -7,19 +16,10 @@ import {
   CardHeader,
   CardTitle,
 } from "../../components/ui/Card";
-import { Button } from "../../components/ui/Button";
 import {
   useApplication,
   useUploadedDocuments,
 } from "../../hooks/useApplications";
-import {
-  ArrowLeft,
-  Download,
-  Eye,
-  Clock,
-  CheckCircle,
-  XCircle,
-} from "lucide-react";
 import { backend } from "../../lib/backend";
 
 export const Route = createFileRoute("/application/$id")({

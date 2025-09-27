@@ -1,214 +1,248 @@
+import "dotenv/config";
 import {
+  AppwriteException,
   Client,
   Databases,
-  Storage,
-  Teams,
-  ID,
   Permission,
   Role,
-} from "appwrite";
+  Storage,
+  Teams,
+} from "node-appwrite";
 
-// Initialize Appwrite client
+const DATABASE_ID = "spaza-db";
+const APPLICATIONS_COLLECTION_ID = "applications";
+const UPLOADED_DOCUMENTS_COLLECTION_ID = "uploaded_documents";
+const STORAGE_BUCKET_ID = "application-files";
+const ADMINS_TEAM_ID = "admins";
+
 const client = new Client();
 const databases = new Databases(client);
 const storage = new Storage(client);
 const teams = new Teams(client);
 
-// Configuration
-const DATABASE_ID = "spaza-db";
-const APPLICATIONS_COLLECTION_ID = "applications";
-const UPLOADED_DOCUMENTS_COLLECTION_ID = "uploaded_documents";
-const STORAGE_BUCKET_ID = "application-files";
+function isConflict(error: unknown): boolean {
+  return error instanceof AppwriteException && error.code === 409;
+}
 
-async function createCollections() {
+async function ensureDatabase() {
   try {
-    // Set endpoint and project from environment variables
-    const endpoint = process.env.VITE_APPWRITE_ENDPOINT;
-    const projectId = process.env.VITE_APPWRITE_PROJECT_ID;
-
-    if (!endpoint || !projectId) {
-      throw new Error(
-        "Please set VITE_APPWRITE_ENDPOINT and VITE_APPWRITE_PROJECT_ID environment variables",
-      );
-    }
-
-    client.setEndpoint(endpoint).setProject(projectId);
-
-    console.log("Creating Appwrite collections and storage bucket...");
-
-    // Create database
-    try {
-      await databases.create(DATABASE_ID, "Spaza Registration Database");
-      console.log("✓ Database created");
-    } catch (error: any) {
-      if (error.code === 409) {
-        console.log("✓ Database already exists");
-      } else {
-        throw error;
-      }
-    }
-
-    // Create applications collection
-    try {
-      await databases.createCollection(
-        DATABASE_ID,
-        APPLICATIONS_COLLECTION_ID,
-        "Applications",
-        [
-          Permission.create(Role.users()),
-          Permission.read(Role.users()),
-          Permission.read(Role.team("admins")),
-          Permission.update(Role.team("admins")),
-          Permission.delete(Role.team("admins")),
-        ],
-      );
-      console.log("✓ Applications collection created");
-
-      // Create attributes for applications collection
-      const applicationAttributes = [
-        { key: "ownerId", type: "string", size: 255, required: true },
-        { key: "ownerName", type: "string", size: 255, required: true },
-        { key: "phoneNumber", type: "string", size: 50, required: true },
-        { key: "tradeName", type: "string", size: 255, required: true },
-        { key: "location", type: "string", size: 500, required: false },
-        { key: "formData", type: "string", size: 10000, required: true },
-        {
-          key: "status",
-          type: "enum",
-          elements: ["submitted", "reviewing", "approved", "rejected"],
-          required: true,
-          default: "submitted",
-        },
-      ];
-
-      for (const attr of applicationAttributes) {
-        if (attr.type === "enum") {
-          await databases.createEnumAttribute(
-            DATABASE_ID,
-            APPLICATIONS_COLLECTION_ID,
-            attr.key,
-            attr.elements!,
-            attr.required,
-            attr.default,
-          );
-        } else {
-          await databases.createStringAttribute(
-            DATABASE_ID,
-            APPLICATIONS_COLLECTION_ID,
-            attr.key,
-            attr.size!,
-            attr.required,
-            attr.default,
-          );
-        }
-        console.log(`  ✓ Added ${attr.key} attribute`);
-      }
-    } catch (error: any) {
-      if (error.code === 409) {
-        console.log("✓ Applications collection already exists");
-      } else {
-        throw error;
-      }
-    }
-
-    // Create uploaded_documents collection
-    try {
-      await databases.createCollection(
-        DATABASE_ID,
-        UPLOADED_DOCUMENTS_COLLECTION_ID,
-        "Uploaded Documents",
-        [
-          Permission.create(Role.users()),
-          Permission.read(Role.users()),
-          Permission.read(Role.team("admins")),
-          Permission.update(Role.team("admins")),
-          Permission.delete(Role.team("admins")),
-        ],
-      );
-      console.log("✓ Uploaded documents collection created");
-
-      // Create attributes for uploaded_documents collection
-      const documentAttributes = [
-        { key: "applicationId", type: "string", size: 255, required: true },
-        { key: "ownerId", type: "string", size: 255, required: true },
-        { key: "documentType", type: "string", size: 100, required: true },
-        { key: "fileId", type: "string", size: 255, required: true },
-        { key: "filename", type: "string", size: 255, required: true },
-      ];
-
-      for (const attr of documentAttributes) {
-        await databases.createStringAttribute(
-          DATABASE_ID,
-          UPLOADED_DOCUMENTS_COLLECTION_ID,
-          attr.key,
-          attr.size,
-          attr.required,
-        );
-        console.log(`  ✓ Added ${attr.key} attribute`);
-      }
-    } catch (error: any) {
-      if (error.code === 409) {
-        console.log("✓ Uploaded documents collection already exists");
-      } else {
-        throw error;
-      }
-    }
-
-    // Create storage bucket
-    try {
-      await storage.createBucket(
-        STORAGE_BUCKET_ID,
-        "Application Files",
-        [
-          Permission.create(Role.users()),
-          Permission.read(Role.users()),
-          Permission.read(Role.team("admins")),
-          Permission.update(Role.team("admins")),
-          Permission.delete(Role.team("admins")),
-        ],
-        false, // not file security (we'll use permissions)
-        true, // enabled
-        8 * 1024 * 1024, // 8MB max file size
-        ["image/jpeg", "image/png", "image/gif", "application/pdf"], // allowed file types
-        "none", // no compression
-        false, // no encryption
-        false, // no antivirus
-      );
-      console.log("✓ Storage bucket created");
-    } catch (error: any) {
-      if (error.code === 409) {
-        console.log("✓ Storage bucket already exists");
-      } else {
-        throw error;
-      }
-    }
-
-    // Create admins team
-    try {
-      await teams.create("admins", "Administrators");
-      console.log("✓ Admins team created");
-    } catch (error: any) {
-      if (error.code === 409) {
-        console.log("✓ Admins team already exists");
-      } else {
-        throw error;
-      }
-    }
-
-    console.log(
-      "\n🎉 All collections and storage bucket created successfully!",
-    );
-    console.log("\nNext steps:");
-    console.log("1. Create an admin user in the Appwrite console");
-    console.log('2. Add the admin user to the "admins" team');
-    console.log(
-      "3. Update your .env file with the correct endpoint and project ID",
-    );
+    await databases.create(DATABASE_ID, "Spaza Registration Database");
+    console.log("✓ Database created");
   } catch (error) {
-    console.error("❌ Error creating collections:", error);
-    process.exit(1);
+    if (isConflict(error)) {
+      console.log("✓ Database already exists");
+    } else {
+      throw error;
+    }
   }
 }
 
-// Run the setup
-createCollections();
+async function ensureApplicationsCollection() {
+  try {
+    await databases.createCollection(
+      DATABASE_ID,
+      APPLICATIONS_COLLECTION_ID,
+      "Applications",
+      [
+        Permission.create(Role.users()),
+        Permission.read(Role.users()),
+        Permission.read(Role.team(ADMINS_TEAM_ID)),
+        Permission.update(Role.team(ADMINS_TEAM_ID)),
+        Permission.delete(Role.team(ADMINS_TEAM_ID)),
+      ],
+      false,
+    );
+    console.log("✓ Applications collection created");
+  } catch (error) {
+    if (!isConflict(error)) {
+      throw error;
+    }
+    console.log("✓ Applications collection already exists");
+  }
+
+  const attributes: Array<
+    | {
+        kind: "enum";
+        key: string;
+        elements: string[];
+        required: boolean;
+        default?: string;
+      }
+    | {
+        kind: "string";
+        key: string;
+        size: number;
+        required: boolean;
+        default?: string;
+      }
+  > = [
+    { kind: "string", key: "ownerId", size: 255, required: true },
+    { kind: "string", key: "ownerName", size: 255, required: true },
+    { kind: "string", key: "phoneNumber", size: 50, required: true },
+    { kind: "string", key: "tradeName", size: 255, required: true },
+    { kind: "string", key: "location", size: 500, required: false },
+    { kind: "string", key: "formData", size: 10_000, required: true },
+    {
+      kind: "enum",
+      key: "status",
+      elements: ["submitted", "reviewing", "approved", "rejected"],
+      required: true,
+      default: "submitted",
+    },
+  ];
+
+  for (const attribute of attributes) {
+    try {
+      if (attribute.kind === "enum") {
+        await databases.createEnumAttribute(
+          DATABASE_ID,
+          APPLICATIONS_COLLECTION_ID,
+          attribute.key,
+          attribute.elements,
+          attribute.required,
+          attribute.default,
+        );
+      } else {
+        await databases.createStringAttribute(
+          DATABASE_ID,
+          APPLICATIONS_COLLECTION_ID,
+          attribute.key,
+          attribute.size,
+          attribute.required,
+          attribute.default,
+        );
+      }
+      console.log(`  ✓ ${attribute.key} attribute ready`);
+    } catch (error) {
+      if (!isConflict(error)) {
+        throw error;
+      }
+    }
+  }
+}
+
+async function ensureDocumentsCollection() {
+  try {
+    await databases.createCollection(
+      DATABASE_ID,
+      UPLOADED_DOCUMENTS_COLLECTION_ID,
+      "Uploaded Documents",
+      [
+        Permission.create(Role.users()),
+        Permission.read(Role.users()),
+        Permission.read(Role.team(ADMINS_TEAM_ID)),
+        Permission.update(Role.team(ADMINS_TEAM_ID)),
+        Permission.delete(Role.team(ADMINS_TEAM_ID)),
+      ],
+      false,
+    );
+    console.log("✓ Uploaded documents collection created");
+  } catch (error) {
+    if (!isConflict(error)) {
+      throw error;
+    }
+    console.log("✓ Uploaded documents collection already exists");
+  }
+
+  const attributes = [
+    { key: "applicationId", size: 255 },
+    { key: "ownerId", size: 255 },
+    { key: "documentType", size: 100 },
+    { key: "fileId", size: 255 },
+    { key: "filename", size: 255 },
+  ];
+
+  for (const attribute of attributes) {
+    try {
+      await databases.createStringAttribute(
+        DATABASE_ID,
+        UPLOADED_DOCUMENTS_COLLECTION_ID,
+        attribute.key,
+        attribute.size,
+        true,
+      );
+      console.log(`  ✓ ${attribute.key} attribute ready`);
+    } catch (error) {
+      if (!isConflict(error)) {
+        throw error;
+      }
+    }
+  }
+}
+
+async function ensureStorageBucket() {
+  try {
+    await storage.createBucket(
+      STORAGE_BUCKET_ID,
+      "Application Files",
+      [
+        Permission.create(Role.users()),
+        Permission.read(Role.users()),
+        Permission.read(Role.team(ADMINS_TEAM_ID)),
+        Permission.update(Role.team(ADMINS_TEAM_ID)),
+        Permission.delete(Role.team(ADMINS_TEAM_ID)),
+      ],
+      false,
+      true,
+      8 * 1024 * 1024,
+      ["jpg", "jpeg", "png", "gif", "pdf"],
+      undefined,
+      true,
+      true,
+    );
+    console.log("✓ Storage bucket created");
+  } catch (error) {
+    if (!isConflict(error)) {
+      throw error;
+    }
+    console.log("✓ Storage bucket already exists");
+  }
+}
+
+async function ensureAdminsTeam() {
+  try {
+    await teams.create(ADMINS_TEAM_ID, "Administrators");
+    console.log("✓ Admins team created");
+  } catch (error) {
+    if (!isConflict(error)) {
+      throw error;
+    }
+    console.log("✓ Admins team already exists");
+  }
+}
+
+async function main() {
+  const endpoint =
+    process.env.APPWRITE_ENDPOINT ?? process.env.VITE_APPWRITE_ENDPOINT;
+  const projectId =
+    process.env.APPWRITE_PROJECT_ID ?? process.env.VITE_APPWRITE_PROJECT_ID;
+  const apiKey = process.env.APPWRITE_API_KEY;
+
+  if (!endpoint || !projectId || !apiKey) {
+    throw new Error(
+      "Missing APPWRITE_ENDPOINT, APPWRITE_PROJECT_ID, or APPWRITE_API_KEY environment variables.",
+    );
+  }
+
+  client.setEndpoint(endpoint).setProject(projectId).setKey(apiKey);
+
+  console.log("Starting Appwrite project provisioning...\n");
+  await ensureDatabase();
+  await ensureApplicationsCollection();
+  await ensureDocumentsCollection();
+  await ensureStorageBucket();
+  await ensureAdminsTeam();
+
+  console.log("\n🎉 Appwrite project is ready!");
+  console.log("Next steps:");
+  console.log("1. Create an admin account in the Appwrite Console.");
+  console.log(
+    `2. Add the admin user to the "${ADMINS_TEAM_ID}" team via the Console or REST API.`,
+  );
+  console.log("3. Update your .env file with the correct frontend credentials.");
+}
+
+main().catch((error) => {
+  console.error("❌ Error while provisioning Appwrite:", error);
+  process.exit(1);
+});
