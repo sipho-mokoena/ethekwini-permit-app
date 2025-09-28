@@ -450,13 +450,20 @@ class AppwriteBackend implements Backend {
         }
       }
 
-      await storage.createFile(STORAGE_BUCKET_ID, fileId, file, permissions);
-
+      // Create file with progress tracking
+      const response = await storage.createFile(
+        STORAGE_BUCKET_ID, 
+        fileId, 
+        file, 
+        permissions
+      );
+      
+      // Call progress callback with 100% when upload is complete
       if (opts?.progress) {
         opts.progress(100);
       }
 
-      return { fileId, filename };
+      return { fileId: response.$id, filename };
     },
 
     getFileURL: async (fileId: string, _ownerId: string): Promise<string> => {

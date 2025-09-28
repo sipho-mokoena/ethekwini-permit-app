@@ -35,6 +35,7 @@ export function FileUploader({
 }: FileUploaderProps) {
   const [files, setFiles] = useState<FileUploadItem[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [uploading, setUploading] = useState(false); // Add uploading state
   const fileInputRef = useRef<HTMLInputElement>(null);
   const filesRef = useRef<FileUploadItem[]>([]);
   const inputId = useId();
@@ -167,6 +168,7 @@ export function FileUploader({
     if (!fileItem || fileItem.uploaded || fileItem.error) return;
 
     try {
+      setUploading(true); // Set uploading to true when starting upload
       const currentUser = await backend.auth.getCurrentUser();
 
       if (!currentUser) {
@@ -218,6 +220,8 @@ export function FileUploader({
             : item,
         ),
       );
+    } finally {
+      setUploading(false); // Set uploading to false when upload completes (success or failure)
     }
   };
 
@@ -267,50 +271,52 @@ export function FileUploader({
 
   return (
     <div className={cn("space-y-4", className)}>
-      <label
-        htmlFor={inputId}
-        className={cn(
-          "rounded-lg p-6 text-center transition-colors cursor-pointer",
-          isDragOver
-            ? "border-primary bg-primary/5"
-            : "border-muted-foreground/25",
-          files.length >= maxFiles && "opacity-50 cursor-not-allowed",
-        )}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
-        onClick={(event) => {
-          if (files.length >= maxFiles) {
-            event.preventDefault();
-          }
-        }}
-        onKeyDown={(event) => {
-          if (
-            (event.key === "Enter" || event.key === " ") &&
-            files.length < maxFiles
-          ) {
-            event.preventDefault();
-            fileInputRef.current?.click();
-          }
-        }}
-        aria-disabled={files.length >= maxFiles}
-      >
-        <Upload className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-        <p className="text-lg font-medium mb-2">
-          Drop files here or click to browse
-        </p>
-        <p className="text-sm text-muted-foreground mb-4">
-          {acceptedTypes.join(", ")} up to {formatFileSize(maxFileSize)}
-        </p>
-        {/* <Button
-          type="button"
-          variant="outline"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={files.length >= maxFiles}
+      {!uploading && files.length === 0 && (
+        <label
+          htmlFor={inputId}
+          className={cn(
+            "rounded-lg p-6 text-center transition-colors cursor-pointer",
+            isDragOver
+              ? "border-primary bg-primary/5"
+              : "border-muted-foreground/25",
+            files.length >= maxFiles && "opacity-50 cursor-not-allowed",
+          )}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+          onClick={(event) => {
+            if (files.length >= maxFiles) {
+              event.preventDefault();
+            }
+          }}
+          onKeyDown={(event) => {
+            if (
+              (event.key === "Enter" || event.key === " ") &&
+              files.length < maxFiles
+            ) {
+              event.preventDefault();
+              fileInputRef.current?.click();
+            }
+          }}
+          aria-disabled={files.length >= maxFiles}
         >
-          Choose Files
-        </Button> */}
-      </label>
+          <Upload className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+          <p className="text-lg font-medium mb-2">
+            Drop files here or click to browse
+          </p>
+          <p className="text-sm text-muted-foreground mb-4">
+            {acceptedTypes.join(", ")} up to {formatFileSize(maxFileSize)}
+          </p>
+          {/* <Button
+            type="button"
+            variant="outline"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={files.length >= maxFiles}
+          >
+            Choose Files
+          </Button> */}
+        </label>
+      )}
 
       <input
         id={inputId}
@@ -322,7 +328,7 @@ export function FileUploader({
         className="hidden"
       />
 
-      {files.length > 0 ? (
+      {files.length > 0 && (
         <div className="space-y-3">
           {files.map((fileItem, index) => (
             <div
@@ -371,9 +377,10 @@ export function FileUploader({
                     size="sm"
                     variant="outline"
                     onClick={() => uploadFile(index)}
+                    disabled={uploading}
                     className="mt-2"
                   >
-                    Upload
+                    {uploading ? "Uploading..." : "Upload"}
                   </Button>
                 )}
               </div>
@@ -390,7 +397,7 @@ export function FileUploader({
             </div>
           ))}
         </div>
-      ) : null}
+      )}
     </div>
   );
 }
