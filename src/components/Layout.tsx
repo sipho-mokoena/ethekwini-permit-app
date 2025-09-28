@@ -1,6 +1,6 @@
 import { Link, Outlet, useLocation } from "@tanstack/react-router";
-import { LogOut, Menu, Wifi, WifiOff, X } from "lucide-react";
-import React, { useEffect, useState } from "react";
+import { LogOut, Menu, WifiOff, X } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useAuth } from "../hooks/useAuth";
 import { isLocalMode } from "../lib/backend";
 import { Button } from "./ui/Button";
@@ -24,6 +24,11 @@ export function Layout() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!user && !location.href.includes("login")) window.location.href = "/login";
+  }, [location, user])
+
+
   const handleLogout = async () => {
     try {
       await logout();
@@ -32,7 +37,6 @@ export function Layout() {
     }
   };
 
-  const isAdminRoute = location.pathname.startsWith("/admin");
 
   return (
     <div className="min-h-screen bg-background">
@@ -61,11 +65,9 @@ export function Layout() {
               {user && (
                 <>
                   {user.isAdmin ? (
-                    <>
-                      <Link to="/admin/applications">
-                        <Button variant="ghost">Applications</Button>
-                      </Link>
-                    </>
+                    <Link to="/admin/applications">
+                      <Button variant="ghost">Applications</Button>
+                    </Link>
                   ) : (
                     <>
                       <Link to="/dashboard">

@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Button } from "../components/ui/Button";
 import {
@@ -67,7 +67,7 @@ function LoginPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form className="space-y-4">
             <div>
               <Input
                 type="email"
@@ -97,10 +97,20 @@ function LoginPage() {
               </p>
             )}
 
-            <Button type="submit" className="w-full" disabled={isLoggingIn}>
+            <Button type="button" variant="outline" onClick={handleSubmit} className="w-full" disabled={isLoggingIn}>
               {isLoggingIn ? "Signing in..." : "Sign In"}
             </Button>
           </form>
+          <div className="mt-6 pt-6 border-t text-center">
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              onClick={() => navigate({ to: "/admin/login" })}
+            >
+              I'm an admin
+            </Button>
+          </div>
 
           <div className="mt-6 pt-6 border-t text-center">
             <p className="text-sm text-muted-foreground mb-3">
