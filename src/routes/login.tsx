@@ -97,7 +97,13 @@ function LoginPage() {
               </p>
             )}
 
-            <Button type="button" variant="outline" onClick={handleSubmit} className="w-full" disabled={isLoggingIn}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleSubmit}
+              className="w-full"
+              disabled={isLoggingIn}
+            >
               {isLoggingIn ? "Signing in..." : "Sign In"}
             </Button>
           </form>

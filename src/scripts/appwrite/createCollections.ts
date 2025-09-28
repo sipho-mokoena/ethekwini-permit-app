@@ -275,6 +275,16 @@ async function ensureStorageBucket() {
 
 async function ensureAdminsTeam() {
   try {
+    await teams.get(ADMINS_TEAM_ID);
+    console.log("✓ Admins team already exists");
+    return;
+  } catch (error) {
+    if (!(error instanceof AppwriteException) || error.code !== 404) {
+      throw error;
+    }
+  }
+
+  try {
     await teams.create(ADMINS_TEAM_ID, "Administrators");
     console.log("✓ Admins team created");
   } catch (error) {

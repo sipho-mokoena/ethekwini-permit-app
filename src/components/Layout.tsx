@@ -25,9 +25,14 @@ export function Layout() {
   }, []);
 
   useEffect(() => {
-    if (!user && !location.href.includes("login")) window.location.href = "/login";
-  }, [location, user])
-
+    if (
+      !user &&
+      !location.href.includes("login") &&
+      !location.href.includes("register")
+    ) {
+      window.location.href = "/login";
+    }
+  }, [location, user]);
 
   const handleLogout = async () => {
     try {
@@ -36,7 +41,6 @@ export function Layout() {
       console.error("Logout failed:", error);
     }
   };
-
 
   return (
     <div className="min-h-screen bg-background">

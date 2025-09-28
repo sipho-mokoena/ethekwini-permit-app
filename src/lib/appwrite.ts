@@ -111,7 +111,8 @@ class AppwriteBackend implements Backend {
       const ownerName = input.ownerName.trim();
       const phone = input.phone.trim();
       try {
-        await account.create(ID.unique(), email, input.password, ownerName);
+        const uid = ID.unique();
+        await account.create(uid, email, input.password, ownerName);
       } catch (error) {
         if (error instanceof Error) {
           throw new Error(
@@ -193,6 +194,29 @@ class AppwriteBackend implements Backend {
         );
       }
 
+      // Prepare permissions using the correct format
+      const permissions = [
+        Permission.read(Role.user(currentUser.id)),
+        Permission.update(Role.user(currentUser.id)),
+        Permission.delete(Role.user(currentUser.id)),
+        Permission.read(Role.users()),
+      ];
+
+      // Only add team permissions if user is admin
+      if (currentUser.isAdmin) {
+        try {
+          await teams.get(ADMINS_TEAM_ID);
+          permissions.push(
+            Permission.read(Role.team(ADMINS_TEAM_ID)),
+            Permission.update(Role.team(ADMINS_TEAM_ID)),
+            Permission.delete(Role.team(ADMINS_TEAM_ID)),
+          );
+        } catch (error) {
+          // If team doesn't exist, log but continue
+          console.debug("Admin team not found:", error);
+        }
+      }
+
       const doc = await databases.createDocument<ApplicationDocument>(
         DATABASE_ID,
         APPLICATIONS_COLLECTION_ID,
@@ -206,10 +230,7 @@ class AppwriteBackend implements Backend {
           formData: JSON.stringify(app.formData),
           status: "submitted",
         },
-        [
-          Permission.read(Role.user(currentUser.id)),
-          Permission.read(Role.team(ADMINS_TEAM_ID)),
-        ],
+        permissions,
       );
 
       return {
@@ -322,6 +343,32 @@ class AppwriteBackend implements Backend {
     createUploadedDocument: async (
       doc: UploadedDocumentInput,
     ): Promise<UploadedDocument> => {
+      const currentUser = await this.auth.getCurrentUser();
+      if (!currentUser) throw new Error("Not authenticated");
+
+      // Prepare permissions using the correct format
+      const permissions = [
+        Permission.read(Role.user(doc.ownerId)),
+        Permission.update(Role.user(doc.ownerId)),
+        Permission.delete(Role.user(doc.ownerId)),
+        Permission.read(Role.users()),
+      ];
+
+      // Only add team permissions if user is admin
+      if (currentUser.isAdmin) {
+        try {
+          await teams.get(ADMINS_TEAM_ID);
+          permissions.push(
+            Permission.read(Role.team(ADMINS_TEAM_ID)),
+            Permission.update(Role.team(ADMINS_TEAM_ID)),
+            Permission.delete(Role.team(ADMINS_TEAM_ID)),
+          );
+        } catch (error) {
+          // If team doesn't exist, log but continue
+          console.debug("Admin team not found:", error);
+        }
+      }
+
       const result = await databases.createDocument<UploadedDocumentRecord>(
         DATABASE_ID,
         UPLOADED_DOCUMENTS_COLLECTION_ID,
@@ -333,10 +380,7 @@ class AppwriteBackend implements Backend {
           fileId: doc.fileId,
           filename: doc.filename,
         },
-        [
-          Permission.read(Role.user(doc.ownerId)),
-          Permission.read(Role.team(ADMINS_TEAM_ID)),
-        ],
+        permissions,
       );
 
       return {
@@ -386,11 +430,27 @@ class AppwriteBackend implements Backend {
     ): Promise<FileUploadResult> => {
       const fileId = ID.unique();
       const filename = opts?.filename || file.name;
+      const currentUser = await this.auth.getCurrentUser();
+      if (!currentUser) throw new Error("Not authenticated");
 
-      await storage.createFile(STORAGE_BUCKET_ID, fileId, file, [
+      // Prepare permissions using the correct format
+      const permissions = [
         Permission.read(Role.user(ownerId)),
-        Permission.read(Role.team(ADMINS_TEAM_ID)),
-      ]);
+        Permission.read(Role.users()),
+      ];
+
+      // Only add team permissions if user is admin
+      if (currentUser.isAdmin) {
+        try {
+          await teams.get(ADMINS_TEAM_ID);
+          permissions.push(Permission.read(Role.team(ADMINS_TEAM_ID)));
+        } catch (error) {
+          // If team doesn't exist, log but continue
+          console.debug("Admin team not found:", error);
+        }
+      }
+
+      await storage.createFile(STORAGE_BUCKET_ID, fileId, file, permissions);
 
       if (opts?.progress) {
         opts.progress(100);

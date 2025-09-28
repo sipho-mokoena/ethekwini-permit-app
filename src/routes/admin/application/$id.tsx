@@ -5,6 +5,10 @@ import {
   Clock,
   Download,
   Eye,
+  FileText,
+  Image as ImageIcon,
+  Minus,
+  Plus,
   XCircle,
 } from "lucide-react";
 import React, { useState } from "react";
@@ -34,6 +38,7 @@ function AdminApplicationDetailPage() {
   const { data: documents } = useUploadedDocuments(id);
   const updateStatus = useUpdateApplicationStatus();
   const [selectedStatus, setSelectedStatus] = useState("");
+  const [openDocumentId, setOpenDocumentId] = useState<string | null>(null);
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -95,6 +100,20 @@ function AdminApplicationDetailPage() {
     } catch (error) {
       console.error("Failed to download file:", error);
     }
+  };
+
+  const toggleDocument = (documentId: string) => {
+    setOpenDocumentId(openDocumentId === documentId ? null : documentId);
+  };
+
+  const isViewableDocument = (filename: string) => {
+    const extension = filename.split(".").pop()?.toLowerCase();
+    return (
+      extension === "pdf" ||
+      extension === "jpg" ||
+      extension === "jpeg" ||
+      extension === "png"
+    );
   };
 
   if (isLoading) {
@@ -293,33 +312,89 @@ function AdminApplicationDetailPage() {
               {documents?.length ? (
                 <div className="space-y-3">
                   {documents.map((doc) => (
-                    <div key={doc.id} className="p-3 border rounded-lg">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm truncate">
-                            {doc.filename}
-                          </p>
-                          <p className="text-xs text-muted-foreground capitalize">
-                            {doc.documentType.replace("_", " ")}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {new Date(doc.uploadedAt).toLocaleDateString()}
-                          </p>
+                    <div key={doc.id} className="border rounded-lg">
+                      <button
+                        type="button"
+                        className="flex items-center justify-between w-full p-3 text-left cursor-pointer hover:bg-muted/50"
+                        onClick={() =>
+                          isViewableDocument(doc.filename) &&
+                          toggleDocument(doc.id)
+                        }
+                        aria-expanded={openDocumentId === doc.id}
+                        aria-controls={`document-preview-${doc.id}`}
+                      >
+                        <div className="flex items-center space-x-2">
+                          {isViewableDocument(doc.filename) ? (
+                            openDocumentId === doc.id ? (
+                              <Minus className="w-4 h-4" />
+                            ) : (
+                              <Plus className="w-4 h-4" />
+                            )
+                          ) : (
+                            <FileText className="w-4 h-4" />
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-sm truncate">
+                              {doc.filename}
+                            </p>
+                            <p className="text-xs text-muted-foreground capitalize">
+                              {doc.documentType.replace("_", " ")}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {new Date(doc.uploadedAt).toLocaleDateString()}
+                            </p>
+                          </div>
                         </div>
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() =>
+                          onClick={(e) => {
+                            e.stopPropagation();
                             handleDownloadFile(
                               doc.fileId,
                               doc.ownerId,
                               doc.filename,
-                            )
-                          }
+                            );
+                          }}
                         >
                           <Download className="w-3 h-3" />
                         </Button>
-                      </div>
+                      </button>
+
+                      {isViewableDocument(doc.filename) &&
+                        openDocumentId === doc.id && (
+                          <div
+                            id={`document-preview-${doc.id}`}
+                            className="p-3 border-t bg-muted/30"
+                          >
+                            <div className="mb-2 flex items-center space-x-2">
+                              <ImageIcon className="w-4 h-4" />
+                              <span className="text-sm font-medium">
+                                Preview
+                              </span>
+                            </div>
+                            <div className="flex justify-center">
+                              <p className="text-muted-foreground">
+                                Click "Open Document" to view the file
+                              </p>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="ml-2"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDownloadFile(
+                                    doc.fileId,
+                                    doc.ownerId,
+                                    doc.filename,
+                                  );
+                                }}
+                              >
+                                Open Document
+                              </Button>
+                            </div>
+                          </div>
+                        )}
                     </div>
                   ))}
                 </div>

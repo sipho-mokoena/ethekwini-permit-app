@@ -10,7 +10,8 @@
     "ts:check": "tsc --noEmit",
     "format": "biome format --write ./src",
     "preview": "vite preview",
-    "appwrite:setup": "tsx src/scripts/appwrite/createCollections.ts"
+    "appwrite:setup": "tsx src/scripts/appwrite/createCollections.ts",
+    "admin:register": "tsx src/scripts/registerAdmin.ts"
   },
   "dependencies": {
     "@appwrite.io/pink-icons": "^1.0.0",

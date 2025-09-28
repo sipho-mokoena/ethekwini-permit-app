@@ -79,6 +79,27 @@ After running:
 2. Add the user to the `admins` team.
 3. Update any production `.env` files with the endpoint, project ID, and bucket name if you change defaults.
 
+## Registering an Admin User
+
+To register an admin user programmatically, you can use the admin registration script:
+
+1. First, ensure you have:
+   - A valid Appwrite project set up (see [Provisioning Appwrite](#provisioning-appwrite))
+   - Valid `VITE_APPWRITE_ENDPOINT` and `VITE_APPWRITE_PROJECT_ID` in your `.env` file
+
+2. Set the required environment variables in your `.env` file:
+   - `ADMIN_EMAIL` - The email for the admin user
+   - `ADMIN_PASSWORD` - The password for the admin user
+   - `ADMIN_NAME` - The name of the admin user (optional, defaults to "Admin User")
+
+3. Run the script:
+
+```powershell
+pnpm admin:register
+```
+
+This will create a new user account with the provided credentials and attempt to add them to the `admins` team.
+
 ## Handy Scripts
 
 | Command | Purpose |
@@ -90,6 +111,7 @@ After running:
 | `pnpm ts:check` | Type-check the whole project |
 | `pnpm format` | Format code in `src/` using Biome |
 | `pnpm appwrite:setup` | Provision Appwrite collections, bucket, and team |
+| `pnpm admin:register` | Register an admin user using environment variables |
 
 ## Testing the Flow
 
