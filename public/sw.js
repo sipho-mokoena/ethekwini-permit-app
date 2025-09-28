@@ -1,9 +1,9 @@
 const CACHE_NAME = 'spaza-registration-v1'
 const urlsToCache = [
   '/',
-  '/static/js/bundle.js',
-  '/static/css/main.css',
-  '/manifest.json'
+  '/manifest.json',
+  '/icon-192.png',
+  '/icon-512.png'
 ]
 
 self.addEventListener('install', (event) => {
@@ -14,6 +14,11 @@ self.addEventListener('install', (event) => {
 })
 
 self.addEventListener('fetch', (event) => {
+  // Skip cross-origin requests
+  if (!event.request.url.startsWith(self.location.origin)) {
+    return
+  }
+  
   event.respondWith(
     caches.match(event.request)
       .then((response) => {
@@ -23,14 +28,26 @@ self.addEventListener('fetch', (event) => {
         }
         
         // For API requests, try network first
-        if (event.request.url.includes('/api/') || event.request.url.includes('/v1/')) {
+        if (event.request.url.includes('/v1/')) {
           return fetch(event.request).catch(() => {
             // Return offline page for API failures
             return new Response('Offline', { status: 503 })
           })
         }
         
+        // For navigation requests, serve the root index.html
+        if (event.request.mode === 'navigate') {
+          return caches.match('/') || fetch(event.request)
+        }
+        
         return fetch(event.request)
+      })
+      .catch(() => {
+        // If we're offline and it's a navigation request, return the cached root
+        if (event.request.mode === 'navigate') {
+          return caches.match('/')
+        }
+        return new Response('Network Error', { status: 500 })
       })
   )
 })

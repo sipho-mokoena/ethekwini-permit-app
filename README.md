@@ -113,6 +113,20 @@ This will create a new user account with the provided credentials and attempt to
 | `pnpm appwrite:setup` | Provision Appwrite collections, bucket, and team |
 | `pnpm admin:register` | Register an admin user using environment variables |
 
+## Deployment to Vercel
+
+To deploy this application to Vercel:
+
+1. Push your code to a GitHub repository
+2. Connect the repository to Vercel
+3. Configure the environment variables in Vercel project settings:
+   - `VITE_USE_LOCALDB` - Set to `false` for Appwrite mode
+   - `VITE_APPWRITE_ENDPOINT` - Your Appwrite endpoint
+   - `VITE_APPWRITE_PROJECT_ID` - Your Appwrite project ID
+   - `VITE_APPWRITE_PROJECT_NAME` - Your Appwrite project name
+
+The application includes a `vercel.json` configuration file that ensures proper routing for single-page applications.
+
 ## Testing the Flow
 
 1. Run `pnpm dev`.
