@@ -11,6 +11,8 @@ import {
 } from "../components/ui/Card";
 import { useApplications } from "../hooks/useApplications";
 import { useAuth } from "../hooks/useAuth";
+import { isLocalMode } from "../lib/backend";
+import { migrateLocalToAppwrite } from "../scripts/migrateLocalToAppwrite";
 
 export const Route = createFileRoute("/dashboard")({
   component: DashboardPage,
@@ -21,6 +23,12 @@ function DashboardPage() {
   const { data: applications, isLoading } = useApplications({
     ownerId: user?.id,
   });
+
+  // React.useEffect(() => {
+  //   if (!isLocalMode) {
+  //     migrateLocalToAppwrite();
+  //   }
+  // }, []);
 
   const getStatusIcon = (status: string) => {
     switch (status) {

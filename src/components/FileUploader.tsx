@@ -270,7 +270,7 @@ export function FileUploader({
       <label
         htmlFor={inputId}
         className={cn(
-          "border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer",
+          "rounded-lg p-6 text-center transition-colors cursor-pointer",
           isDragOver
             ? "border-primary bg-primary/5"
             : "border-muted-foreground/25",
@@ -302,14 +302,14 @@ export function FileUploader({
         <p className="text-sm text-muted-foreground mb-4">
           {acceptedTypes.join(", ")} up to {formatFileSize(maxFileSize)}
         </p>
-        <Button
+        {/* <Button
           type="button"
           variant="outline"
           onClick={() => fileInputRef.current?.click()}
           disabled={files.length >= maxFiles}
         >
           Choose Files
-        </Button>
+        </Button> */}
       </label>
 
       <input

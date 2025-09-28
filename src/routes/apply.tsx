@@ -29,9 +29,24 @@ const REQUIRED_DOCUMENTS = [
     description: "Clear copy of your ID book or card",
   },
   {
+    type: "tax_clearance",
+    label: "Tax Clearance Certificate",
+    description: "Valid tax clearance certificate from SARS",
+  },
+  {
+    type: "food_accessibility_certificate",
+    label: "Certificate of Accessibility for Food Standards",
+    description: "Certificate from local health department",
+  },
+  {
     type: "proof_of_residence",
     label: "Proof of Residence",
     description: "Municipal account or lease agreement",
+  },
+  {
+    type: "fire_safety_certificate",
+    label: "Fire Safety Certificate",
+    description: "Certificate from local fire department",
   },
   {
     type: "business_plan",
